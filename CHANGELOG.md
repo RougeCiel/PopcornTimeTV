@@ -5,6 +5,27 @@ What changed in each version of this fork of PopcornTimeTV, newest first. The in
 (`PopcornTime/UI/Shared SwiftUI/WhatsNew.swift`). The technical reference (formats, Top Shelf,
 logs, tests) is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
+## Unreleased
+
+**Skip Intro / Recap / Credits (Apple TV, iPhone / iPad, Mac)**
+- Files with chapters named for their intro, recap, credits or preview (« Intro », « Opening »,
+  « OP », « Previously On », « Recap », « End Credits », « ED », « Preview »…, and their French,
+  Spanish, Italian, German and Portuguese names) offer « Skip Intro », « Skip Recap », « Skip
+  Credits » or « Skip Preview » while that part plays; the button jumps to its end. Matroska
+  chapters are read from the file (also when they sit after the clusters, as the torrent
+  downloads them), MP4 / MOV chapter tracks through AVFoundation. On the Apple TV the native
+  player shows AVKit's contextual action, the VLC player a focused button (Menu puts it away);
+  iPhone / iPad and Mac show it over the player, native and VLC alike.
+- Bounds keep a mislabelled chapter from skipping the story: an intro or recap within the first
+  half and at most 5 min long, credits within the second half and at most 15 min long; a
+  « Post-Credits Scene » is never skipped, and credits followed by one stay skippable instead of
+  ending the episode.
+- When credits end an episode, the « next episode » card comes as they start (instead of the
+  fixed « Next Episode Card » time), and its countdown runs that setting's length from there:
+  the next episode starts during the credits.
+- External sources of intro times (a community base) can be plugged in behind a protocol
+  (`SkipMarkerProvider`); none is enabled, the file's chapters work alone.
+
 ## 5.5.0
 
 Its short form is shown once in the app after the update (`WhatsNewRelease.v5_5_0`).

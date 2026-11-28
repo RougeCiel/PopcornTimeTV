@@ -520,6 +520,16 @@ private struct MacPlayerSession: View {
                 .keyboardShortcut("n", modifiers: [])
                 .opacity(0)
         }
+        // « Skip Intro / Recap / Credits » (the file's chapters), native and
+        // VLC alike: above AVKit's floating controls, where the « next
+        // episode » card comes (never at the same time).
+        .overlay(alignment: .bottomTrailing) {
+            if let watch = controller.skipWatch {
+                SkipMarkerButton(watch: watch)
+                    .padding(.trailing, 24)
+                    .padding(.bottom, 96)
+            }
+        }
         // Bounded storage: a rewind stopped at the earliest point still on disk.
         .boundedStorageToast(controller.boundedToast)
         .background(Color.black)
@@ -806,6 +816,8 @@ final class MacPlayerController: ObservableObject {
     private var releaseNames: [String] = []
     /// The file played (VLC's subtitle pick: `SubtitleHashLookup.pick`).
     private(set) var playedFile: URL?
+    /// « Skip Intro »: the markers of the file played (native and VLC).
+    @Published private(set) var skipWatch: SkipMarkerWatch?
     /// The retimed files' selection check is under way (asynchronous).
     private var retimeCheckInFlight = false
     /// Picture in Picture is on: the stuck-playback safety net stays out of
@@ -1051,6 +1063,9 @@ final class MacPlayerController: ObservableObject {
                           + ", native jumps \(self.nativeJumps ? "on" : "off (\(RemuxPlayback.nativeJumpsDisabledKey))")")
                 }
                 self.playedFile = videoFilePath
+                let skip = SkipMarkerWatch.watch(for: videoFilePath, media: self.media)
+                skip.attach { [weak self] target in self?.skipMarkerSeek(to: target) }
+                self.skipWatch = skip
                 if route != .vlc {
                     self.releaseNames = SubtitleFileContext.releaseNames(ofFile: videoFilePath)
                     self.startHashLookup(localFile: videoFilePath)
@@ -1848,9 +1863,12 @@ final class MacPlayerController: ObservableObject {
     /// playlist: the card then comes after the file, never on a guess);
     /// paused only by the user's own pause.
     private func tickUpNext() {
-        guard let upNext, !stopped, vlcURL == nil, player != nil, let position = lastKnownTime else { return }
+        guard !stopped, vlcURL == nil, player != nil, let position = lastKnownTime else { return }
         var duration = lastKnownDuration
         if duration == nil, !isDirectPlayback, let total = remux?.session?.totalDurationSeconds, total > 0 { duration = total }
+        // « Skip Intro »: the same clock.
+        skipWatch?.tick(position: position, duration: duration)
+        guard let upNext else { return }
         upNext.tick(position: position, duration: duration, isPlaying: playIntent.wantsPlayback)
     }
 
@@ -2657,6 +2675,13 @@ final class MacPlayerController: ObservableObject {
         if player.rate != 0 { player.pause() } else { player.play() }
     }
 
+    /// The skip button, native player: a seek like the player view's own
+    /// (VLC, once it took over, jumps itself: `MacVLCPlayerView`).
+    private func skipMarkerSeek(to target: Double) {
+        guard let player = player, vlcURL == nil, let item = player.currentItem, item.status == .readyToPlay else { return }
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     /// ±10 s: a seek like the player view's own — its time jump goes
     /// through the same checks (the remux's positions, bounded storage).
     private func commandSkip(by seconds: Double) {
@@ -3003,6 +3028,7 @@ final class MacPlayerController: ObservableObject {
         #endif
         saveProgressIfNeeded()
         stopped = true
+        skipWatch?.stop()
         hashLookup?.stop()
         hashLookup = nil
         MacPlaybackCommandCenter.shared.unregister(self)

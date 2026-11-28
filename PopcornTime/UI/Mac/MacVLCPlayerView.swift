@@ -756,6 +756,15 @@ final class MacVLCController: NSObject, ObservableObject, VLCMediaPlayerDelegate
         seek(to: pending)
     }
 
+    /// The skip button: VLC to the end of the part (seconds of the file).
+    private func skipMarkerSeek(to seconds: Double) {
+        guard !isStopped, resumeWait == nil else { return }
+        if player.isSeekable { watch.userMovedPlayhead() }
+        let target = limitedSeekSeconds(seconds)
+        playheadWatch.noteOwnSeek()
+        player.time = VLCTime(number: NSNumber(value: Int32(clamping: Int64(target * 1000))))
+    }
+
     func seek(to newPosition: Double) {
         pendingScrub = nil
         guard resumeWait == nil else { return } // as `scrub`
@@ -839,7 +848,14 @@ final class MacVLCController: NSObject, ObservableObject, VLCMediaPlayerDelegate
     /// stopped by itself near the end (not an error part-way, not while a
     /// resume is on its way).
     private func tickUpNext() {
-        guard let upNext, !isStopped, resumeWait == nil, didReachPlayingWithTracks else { return }
+        guard !isStopped, resumeWait == nil, didReachPlayingWithTracks else { return }
+        // « Skip Intro »: the sheet's watch of this file (`MacPlayerController.skipWatch`), jumped by VLC now.
+        if let skip = SkipMarkerWatch.current, player.state == .playing || player.state == .paused,
+           let position = playheadSeconds {
+            skip.attach { [weak self] target in self?.skipMarkerSeek(to: target) }
+            skip.tick(position: position, duration: durationSeconds)
+        }
+        guard let upNext else { return }
         switch player.state {
         case .playing, .paused:
             guard let position = playheadSeconds else { return }

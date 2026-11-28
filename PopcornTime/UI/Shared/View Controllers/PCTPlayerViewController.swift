@@ -218,6 +218,10 @@ class PCTPlayerViewController: UIViewController, VLCMediaPlayerDelegate, UIGestu
         // nothing of the next episode starts.
         if !isClosingForNextEpisode { upNextSession?.playerClosed() }
         upNextCardSubscription = nil
+        skipSubscription = nil
+        skipWatch?.stop()
+        skipWatch = nil
+        if let overlay = skipOverlay, overlay.presentingViewController != nil { overlay.dismiss(animated: false) }
 #endif
         if !isClosing {
             notePlayerPosition()
@@ -688,6 +692,12 @@ class PCTPlayerViewController: UIViewController, VLCMediaPlayerDelegate, UIGestu
     #endif
     private var isClosingForNextEpisode = false
     private var upNextRetryScheduled = false
+    /// « Skip Intro / Recap / Credits »: the file's markers (the native
+    /// player's watch when it handed over) and the button over the video.
+    private var skipWatch: SkipMarkerWatch?
+    private var skipSubscription: AnyCancellable?
+    private weak var skipOverlay: SkipMarkerOverlayViewController?
+    private var skipRetryScheduled = false
 #endif
     internal var startPosition: Float = 0.0
     private var idleWorkItem: DispatchWorkItem?
@@ -784,6 +794,15 @@ class PCTPlayerViewController: UIViewController, VLCMediaPlayerDelegate, UIGestu
         self.imageGenerator = AVAssetImageGenerator(asset: AVAsset(url: local))
         self.streamer = streamer
 #if os(tvOS)
+        let watch = SkipMarkerWatch.watch(for: local, media: media)
+        skipWatch = watch
+        watch.attach { [weak self] target in
+            guard let self = self, !self.isClosing else { return }
+            self.seekLimited(toMilliseconds: NSNumber(value: target * 1000))
+        }
+        skipSubscription = watch.$active.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] _ in
+            self?.reconcileSkipButton()
+        }
         if let session = upNextLink?.attach(self, streamer: streamer) {
             upNextSession = session
             upNextCardSubscription = session.$card.receive(on: DispatchQueue.main).sink { [weak self] card in
@@ -1837,10 +1856,12 @@ class PCTPlayerViewController: UIViewController, VLCMediaPlayerDelegate, UIGestu
 
     /// From VLC's time ticks (and a pause): where the file is, to the session.
     private func upNextTick(isPlaying: Bool) {
-        guard let session = upNextSession, !isClosing, didReceiveTimeTick else { return }
+        guard !isClosing, didReceiveTimeTick else { return }
         let position = (mediaplayer.time.value?.doubleValue ?? 0) / 1000
         let duration = streamDuration > 0 ? Double(streamDuration) / 1000 : nil
         guard position.isFinite, position >= 0 else { return }
+        skipWatch?.tick(position: position, duration: duration)
+        guard let session = upNextSession else { return }
         upNextLastPosition = position
         if let duration = duration { upNextLastDuration = duration }
         session.tick(position: position, duration: duration, isPlaying: isPlaying)
@@ -1901,6 +1922,36 @@ class PCTPlayerViewController: UIViewController, VLCMediaPlayerDelegate, UIGestu
         let overlay = UpNextOverlayViewController(session: upNextSession, summary: upNextSession?.next.summary)
         upNextOverlay = overlay
         print("[UpNext] VLC card: overlay (\(card.kind.rawValue))")
+        present(overlay, animated: true)
+    }
+
+    /// The skip button follows the watch: presented while it offers a part
+    /// (not over another presentation: tried again in a second), gone after.
+    private func reconcileSkipButton() {
+        guard let watch = skipWatch, !isClosing else { return }
+        guard let marker = watch.active else {
+            if let overlay = skipOverlay, overlay.presentingViewController != nil, !overlay.isBeingDismissed {
+                overlay.dismiss(animated: true)
+            }
+            skipOverlay = nil
+            return
+        }
+        if let overlay = skipOverlay, overlay.presentingViewController != nil, !overlay.isBeingDismissed {
+            overlay.update(marker)
+            return
+        }
+        guard viewIfLoaded?.window != nil, presentedViewController == nil, transitionCoordinator == nil else {
+            guard !skipRetryScheduled else { return }
+            skipRetryScheduled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.skipRetryScheduled = false
+                self?.reconcileSkipButton()
+            }
+            return
+        }
+        let overlay = SkipMarkerOverlayViewController(watch: watch)
+        overlay.onPlayPause = { [weak self] in self?.playandPause() }
+        skipOverlay = overlay
         present(overlay, animated: true)
     }
 

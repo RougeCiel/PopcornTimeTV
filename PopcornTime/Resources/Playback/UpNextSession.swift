@@ -352,6 +352,18 @@ final class UpNextSession: ObservableObject {
         handle(countdown.tick(now: environment.now(), position: position, duration: duration, isPlaying: isPlaying))
     }
 
+    /// The credits that end the file start at `start` (seconds; nil: none):
+    /// the card comes there (`UpNextCountdown.useCredits`). `SkipMarkerWatch`
+    /// calls it once the file's markers are known; calling again is free.
+    func useCredits(at start: Double?) {
+        guard !isOver, countdown.creditsStart != start else { return }
+        countdown.useCredits(at: start)
+        if countdown.creditsStart == start, let start = start {
+            environment.log("[UpNext] credits at \(Int(start)) s: card at \(Int(countdown.cardAt ?? -1)) s, "
+                            + "next episode at \(Int(countdown.countdownEnd ?? -1)) s")
+        }
+    }
+
     /// The file ended. True: the session handles the end (after-play card,
     /// start, or the player's close through `Host.closePlayer`) — the player
     /// must not close or loop by itself; false: do as before.

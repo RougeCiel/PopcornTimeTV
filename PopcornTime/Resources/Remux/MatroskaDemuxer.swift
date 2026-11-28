@@ -215,6 +215,20 @@ struct MKVFrame {
 
 // MARK: - Matroska demuxer
 
+/// A chapter of a Matroska file (`MatroskaDemuxer.loadChapters`): its
+/// titles (one per ChapterDisplay: the languages it is named in), its
+/// start and end (nanoseconds, unscaled by TimestampScale).
+struct MKVChapter: Equatable {
+    let titles: [String]
+    let startNs: UInt64
+    let endNs: UInt64?
+
+    var startSeconds: Double { Double(startNs) / 1_000_000_000 }
+    var endSeconds: Double? { endNs.map { Double($0) / 1_000_000_000 } }
+    /// Every title, « Intro / Générique »: what `IntroMarkers` reads.
+    var title: String? { titles.isEmpty ? nil : titles.joined(separator: " / ") }
+}
+
 /// Incremental Matroska / WebM demuxer over a file that may still be
 /// downloading. Torrent payloads are PREALLOCATED at full size: bytes that
 /// haven't been downloaded read as zeros, so every structure that would
@@ -324,6 +338,18 @@ final class MatroskaDemuxer {
         static let cueTrack: UInt32 = 0xF7
         static let cueClusterPosition: UInt32 = 0xF1
         static let chapters: UInt32 = 0x1043A770
+        static let editionEntry: UInt32 = 0x45B9
+        static let editionFlagHidden: UInt32 = 0x45BD
+        static let editionFlagDefault: UInt32 = 0x45DB
+        static let editionFlagOrdered: UInt32 = 0x45DD
+        static let chapterAtom: UInt32 = 0xB6
+        static let chapterTimeStart: UInt32 = 0x91
+        static let chapterTimeEnd: UInt32 = 0x92
+        static let chapterFlagHidden: UInt32 = 0x98
+        static let chapterFlagEnabled: UInt32 = 0x4598
+        static let chapterSegmentUID: UInt32 = 0x6E67
+        static let chapterDisplay: UInt32 = 0x80
+        static let chapString: UInt32 = 0x85
         static let tags: UInt32 = 0x1254C367
         static let attachments: UInt32 = 0x1941A469
         static let void: UInt32 = 0xEC
@@ -431,6 +457,11 @@ final class MatroskaDemuxer {
     /// SeekHeads a SeekHead points to (mkvmerge's second one, at the end of
     /// the file), not read yet: `loadCueIndex` looks for the Cues there.
     private var pendingSeekHeads: [UInt64] = []
+    /// Absolute file offset of the Chapters element (SeekHead, or the walk
+    /// before the first Cluster); nil while unknown. See `loadChapters`.
+    private(set) var chaptersPosition: UInt64?
+    /// Where `parseHeaders` stopped (after Info + Tracks).
+    private var headersEnd: UInt64 = 0
 
     /// When set, `readNextCluster()` only returns frames of these track
     /// numbers; other tracks' blocks are skipped without being copied,
@@ -579,6 +610,8 @@ final class MatroskaDemuxer {
         segmentDataEnd = nil
         cuesPosition = nil
         pendingSeekHeads = []
+        chaptersPosition = nil
+        headersEnd = 0
         runtimeByNumber = [:]
         blockedProbe = nil
         resyncFrom = nil
@@ -697,6 +730,7 @@ final class MatroskaDemuxer {
             default:
                 guard size != UInt64.max else { return false }
                 if id == ID.cues, cuesPosition == nil { cuesPosition = position }
+                if id == ID.chapters, chaptersPosition == nil { chaptersPosition = position }
                 position = bodyStart + size
             }
         }
@@ -719,7 +753,9 @@ final class MatroskaDemuxer {
             guard let element = target, let relative = offset else { return }
             let (absolute, overflow) = segmentDataStart.addingReportingOverflow(relative)
             guard !overflow else { return }
-            if element == ID.cues, cuesPosition == nil {
+            if element == ID.chapters {
+                if chaptersPosition == nil { chaptersPosition = absolute }
+            } else if element == ID.cues, cuesPosition == nil {
                 cuesPosition = absolute
             } else if element == ID.seekHead, absolute != own, !pendingSeekHeads.contains(absolute) {
                 pendingSeekHeads.append(absolute)
@@ -782,6 +818,7 @@ final class MatroskaDemuxer {
     }
 
     private func finishHeaders() {
+        headersEnd = reader.offset
         runtimeByNumber = [:]
         for track in tracks {
             let frameEncodings = track.contentEncodings.filter { $0.scope & 1 != 0 }
@@ -1528,6 +1565,181 @@ final class MatroskaDemuxer {
         cueEntries = entries
         indexedClusterOffsets = Array(Set(entries.map(\.clusterOffset))).sorted()
         return .available(times)
+    }
+
+    // MARK: - Chapters (« Skip Intro », 5.6.0)
+
+    /// What `loadChapters` found.
+    enum ChapterLoad: Equatable {
+        /// The chapters of the edition played (maybe none).
+        case available([MKVChapter])
+        /// The element (or the SeekHead that would list it) is not downloaded yet.
+        case notYet
+        /// No usable chapters: none in the file, ordered chapters, damage.
+        case unavailable(String)
+    }
+
+    /// The upper bound of a Chapters body (a few KB in practice).
+    static let maxChaptersSize: UInt64 = 1024 * 1024
+
+    /// The chapters of the file (call after `parseHeaders`): the Chapters
+    /// element a SeekHead lists, else one met between the headers and the
+    /// first Cluster. Cheap and re-callable; the reader's cursor is not moved.
+    func loadChapters() -> ChapterLoad {
+        if chaptersPosition == nil {
+            // A SeekHead another one points to (mkvmerge's second one).
+            var index = 0
+            while chaptersPosition == nil, index < pendingSeekHeads.count, index < 8 {
+                let seekHead = pendingSeekHeads[index]
+                index += 1
+                guard case let .element(id, size, headerLength) = reader.header(at: seekHead) else {
+                    if assumeFullyDownloaded { continue }
+                    return .notYet
+                }
+                guard id == ID.seekHead, size != UInt64.max, size <= Self.maxSeekHeadSize else { continue }
+                guard let body = headerBody(at: seekHead + UInt64(headerLength), size: size) else {
+                    if assumeFullyDownloaded { continue }
+                    return .notYet
+                }
+                noteSeekEntries(body, at: seekHead)
+            }
+        }
+        if chaptersPosition == nil {
+            // Not listed: the elements between the headers and the first Cluster.
+            var position = headersEnd
+            walk: for _ in 0..<64 {
+                let header = reader.header(at: position)
+                guard case let .element(id, size, headerLength) = header else {
+                    if case .malformed = header { break walk }
+                    return assumeFullyDownloaded ? .unavailable("no Chapters element") : .notYet
+                }
+                switch id {
+                case ID.chapters: chaptersPosition = position; break walk
+                case ID.cluster: break walk
+                default:
+                    guard size != UInt64.max else { break walk }
+                    position += UInt64(headerLength) + size
+                }
+            }
+        }
+        guard let position = chaptersPosition else { return .unavailable("no Chapters element") }
+        let header = reader.header(at: position)
+        guard case let .element(id, size, headerLength) = header else {
+            if case .malformed = header { return .unavailable("malformed Chapters header") }
+            return assumeFullyDownloaded ? .unavailable("Chapters header missing") : .notYet
+        }
+        guard id == ID.chapters else { return .unavailable(String(format: "the Chapters position holds element 0x%X", id)) }
+        guard size != UInt64.max, size <= Self.maxChaptersSize else { return .unavailable("Chapters size \(size)") }
+        let bodyStart = position + UInt64(headerLength)
+        guard let body = reader.bytes(at: bodyStart, count: Int(size)) else {
+            return assumeFullyDownloaded ? .unavailable("Chapters truncated") : .notYet
+        }
+        if !assumeFullyDownloaded, body.last == 0, nextByteIsZero(at: bodyStart + size) { return .notYet }
+        switch Self.parseChapters(body) {
+        case .some(.success(let chapters)): return .available(chapters)
+        case .some(.failure(let reason)): return .unavailable(reason.message)
+        case .none: return assumeFullyDownloaded ? .unavailable("malformed Chapters element") : .notYet
+        }
+    }
+
+    struct ChapterFailure: Error, Equatable { let message: String }
+
+    /// The chapters of a Chapters body: the default edition (else the first)
+    /// that is not ordered (ordered chapters play other parts of the file, or
+    /// other files: their times are not the file's), its enabled, visible
+    /// atoms (nested ones too), sorted by start. nil: a 0x00 byte where an
+    /// element header must be (not downloaded yet) or a malformed element.
+    static func parseChapters(_ body: Data) -> Result<[MKVChapter], ChapterFailure>? {
+        body.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Result<[MKVChapter], ChapterFailure>? in
+            /// ChapterDisplay's ID, 0x80, is a 1-byte ID whose value is 0 —
+            /// reserved in EBML (RFC 8794), which `EBML.header` refuses, yet
+            /// Matroska's own: read here.
+            func chapterHeader(_ slice: UnsafeRawBufferPointer) -> EBML.Header {
+                guard slice.count >= 2, slice[0] == 0x80 else { return EBML.header(in: slice, at: 0) }
+                if slice[1] == 0 { return .zero }
+                guard let (value, length) = EBML.vint(in: slice, at: 1) else { return .truncated }
+                let allOnes = (UInt64(1) << (7 * UInt64(length))) - 1
+                return .element(id: ID.chapterDisplay, size: value == allOnes ? UInt64.max : value, headerLength: 1 + length)
+            }
+            /// Children of `range`, strictly: false on a zero / malformed header or an overrun.
+            func walk(_ range: Range<Int>, _ visit: (UInt32, Range<Int>) -> Bool) -> Bool {
+                var pos = range.lowerBound
+                while pos < range.upperBound {
+                    guard case let .element(id, size, headerLength) =
+                            chapterHeader(UnsafeRawBufferPointer(rebasing: raw[pos..<range.upperBound])) else { return false }
+                    let start = pos + headerLength
+                    guard size != UInt64.max, size <= UInt64(range.upperBound - start) else { return false }
+                    guard visit(id, start..<(start + Int(size))) else { return false }
+                    pos = start + Int(size)
+                }
+                return true
+            }
+            func string(_ range: Range<Int>) -> String {
+                EBML.string(Data(raw[range])).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            struct Edition { var isDefault = false; var isOrdered = false; var isHidden = false; var atoms: [Range<Int>] = [] }
+            var editions: [Edition] = []
+            let valid = walk(0..<raw.count) { id, editionBody in
+                guard id == ID.editionEntry else { return true }
+                var edition = Edition()
+                let ok = walk(editionBody) { field, value in
+                    switch field {
+                    case ID.editionFlagDefault: edition.isDefault = EBML.uint(raw, value) != 0
+                    case ID.editionFlagOrdered: edition.isOrdered = EBML.uint(raw, value) != 0
+                    case ID.editionFlagHidden: edition.isHidden = EBML.uint(raw, value) != 0
+                    case ID.chapterAtom: edition.atoms.append(value)
+                    default: break
+                    }
+                    return true
+                }
+                editions.append(edition)
+                return ok
+            }
+            guard valid else { return nil }
+            guard !editions.isEmpty else { return .success([]) }
+            let playable = editions.filter { !$0.isOrdered }
+            guard let edition = playable.first(where: { $0.isDefault }) ?? playable.first(where: { !$0.isHidden }) ?? playable.first else {
+                return .failure(ChapterFailure(message: "ordered chapters only"))
+            }
+            var chapters: [MKVChapter] = []
+            func atom(_ range: Range<Int>, depth: Int) -> Bool {
+                var start: UInt64?
+                var end: UInt64?
+                var hidden = false
+                var enabled = true
+                var linked = false
+                var titles: [String] = []
+                var children: [Range<Int>] = []
+                let ok = walk(range) { field, value in
+                    switch field {
+                    case ID.chapterTimeStart: start = EBML.uint(raw, value)
+                    case ID.chapterTimeEnd: end = EBML.uint(raw, value)
+                    case ID.chapterFlagHidden: hidden = EBML.uint(raw, value) != 0
+                    case ID.chapterFlagEnabled: enabled = EBML.uint(raw, value) != 0
+                    case ID.chapterSegmentUID: linked = !value.isEmpty
+                    case ID.chapterAtom: children.append(value)
+                    case ID.chapterDisplay:
+                        return walk(value) { displayField, text in
+                            if displayField == ID.chapString {
+                                let title = string(text)
+                                if !title.isEmpty, !titles.contains(title) { titles.append(title) }
+                            }
+                            return true
+                        }
+                    default: break
+                    }
+                    return true
+                }
+                guard ok else { return false }
+                if let start = start, !hidden, enabled, !linked {
+                    chapters.append(MKVChapter(titles: titles, startNs: start, endNs: end.flatMap { $0 > start ? $0 : nil }))
+                }
+                guard depth < 4 else { return true }
+                return children.allSatisfy { atom($0, depth: depth + 1) }
+            }
+            guard edition.atoms.allSatisfy({ atom($0, depth: 0) }) else { return nil }
+            return .success(chapters.sorted { $0.startNs < $1.startNs })
+        }
     }
 
     // MARK: - Jumping through the keyframe index

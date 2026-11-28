@@ -516,6 +516,11 @@ private struct PlaybackScreen: View {
                     BandwidthDeficitBanner(monitor: monitor)
                 }
             }
+            // « Skip Intro / Recap / Credits » (the file's chapters): where
+            // the card comes, which never shows at the same time.
+            .overlay(alignment: .bottomTrailing) {
+                SkipMarkerOverlay(watch: SkipMarkerWatch.watch(for: playback.localFile, media: playback.media))
+            }
             // « Next episode »: bottom trailing, inside the safe area, above
             // AVKit's transport bar.
             .overlay(alignment: .bottomTrailing) {
@@ -523,6 +528,7 @@ private struct PlaybackScreen: View {
                     UpNextCardOverlay(session: upNext)
                 }
             }
+            .onDisappear { SkipMarkerWatch.current?.stop() }
             .sheet(item: upNextChooser, onDismiss: onUpNextChooserDismissed) { request in
                 QualityPickerSheet(title: request.title, torrents: request.torrents, onSelect: onUpNextPicked)
             }
@@ -588,6 +594,18 @@ private struct UpNextCardOverlay: View {
         }
         .animation(.easeInOut(duration: 0.3), value: session.card?.kind)
         .animation(.easeInOut(duration: 0.3), value: session.card == nil)
+    }
+}
+
+/// « Skip Intro » over the player, above AVKit's transport bar.
+private struct SkipMarkerOverlay: View {
+    @ObservedObject var watch: SkipMarkerWatch
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    var body: some View {
+        SkipMarkerButton(watch: watch)
+            .padding(.trailing, 16)
+            .padding(.bottom, verticalSizeClass == .compact ? 64 : 96)
     }
 }
 

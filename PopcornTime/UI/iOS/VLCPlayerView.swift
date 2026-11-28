@@ -314,6 +314,15 @@ final class VLCPlayerViewController: UIViewController, VLCMediaPlayerDelegate, U
         showControls()
     }
 
+    /// The skip button: VLC jumps to the end of the part (forward: bounded
+    /// storage keeps what is ahead).
+    private func skipMarkerSeek(to target: Double) {
+        guard !isClosing, resumeWait == nil else { return }
+        playheadWatch.noteOwnSeek()
+        player.time = VLCTime(number: NSNumber(value: limitedSeekSeconds(target) * 1000))
+        noteUserMovedPlayhead()
+    }
+
     @objc private func seekForward() {
         guard resumeWait == nil else { return }
         playheadWatch.noteOwnSeek()
@@ -1454,10 +1463,16 @@ final class VLCPlayerViewController: UIViewController, VLCMediaPlayerDelegate, U
     /// from VLC's time changes, and at the user's pause. Not while a resume
     /// is on its way (VLC's clock is not the resume point then).
     private func tickUpNext(isPlaying: Bool) {
-        guard !isClosing, resumeWait == nil, let session = UpNextSession.current, let position = playheadSeconds else { return }
+        guard !isClosing, resumeWait == nil, let position = playheadSeconds else { return }
         let now = ProcessInfo.processInfo.systemUptime
         guard !isPlaying || now - upNextTickedAt >= 1 else { return }
         upNextTickedAt = now
+        // « Skip Intro »: the same clock (the screen's watch of this file).
+        if let watch = SkipMarkerWatch.current {
+            watch.attach { [weak self] target in self?.skipMarkerSeek(to: target) }
+            watch.tick(position: position, duration: durationSeconds)
+        }
+        guard let session = UpNextSession.current else { return }
         upNextPosition = position
         session.tick(position: position, duration: durationSeconds, isPlaying: isPlaying)
     }

@@ -152,6 +152,11 @@ struct VideoPlayerWrapper: UIViewControllerRepresentable {
             self.url = url
             self.title = title
             self.readyTimeout = readyTimeout
+            // « Skip Intro »: the screen's watch of this file (`PlaybackScreen`) jumps this player.
+            SkipMarkerWatch.current?.attach { [weak self] target in
+                guard let self = self, !self.didFallBack, let player = self.player else { return }
+                player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            }
             self.downloadProgress = downloadProgress
             if let isWaitingForData = isWaitingForData {
                 self.isWaitingForData = isWaitingForData
@@ -769,11 +774,14 @@ struct VideoPlayerWrapper: UIViewControllerRepresentable {
         /// episode » card — the 1 Hz observer, the user's play / pause. Not
         /// once VLC took over (it reports itself).
         private func tickUpNext() {
-            guard didStart, !didFallBack, let player = player, let session = UpNextSession.current else { return }
+            guard didStart, !didFallBack, let player = player else { return }
             let time = starvation.isRecovering ? (starvation.resumeTime ?? .nan) : player.currentTime().seconds
             guard time.isFinite, time >= 0 else { return }
             var duration = player.currentItem?.duration.seconds ?? .nan
             if !duration.isFinite || duration <= 0 { duration = lastKnownDuration ?? .nan }
+            // « Skip Intro »: the same clock.
+            SkipMarkerWatch.current?.tick(position: time, duration: duration.isFinite && duration > 0 ? duration : nil)
+            guard let session = UpNextSession.current else { return }
             session.tick(position: time, duration: duration.isFinite && duration > 0 ? duration : nil,
                          isPlaying: playIntent.wantsPlayback)
         }

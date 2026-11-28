@@ -1059,3 +1059,9 @@
 "Languages.Settings.Row" = "اللغات حسب النوع";
 "Languages.Settings.Footer" = "لكل ملف اختياراته الخاصة.";
 "Languages.Done" = "تم";
+
+/* « Skip Intro / Recap / Credits » (the file's chapters) */
+"Player.SkipIntro" = "تخطي المقدمة";
+"Player.SkipRecap" = "تخطي الملخص";
+"Player.SkipCredits" = "تخطي شارة النهاية";
+"Player.SkipPreview" = "تخطي المقتطف";

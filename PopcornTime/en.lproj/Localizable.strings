@@ -758,3 +758,9 @@
 "Languages.Settings.Row" = "Languages by Type";
 "Languages.Settings.Footer" = "Each profile has its own.";
 "Languages.Done" = "Done";
+
+/* « Skip Intro / Recap / Credits » (the file's chapters) */
+"Player.SkipIntro" = "Skip Intro";
+"Player.SkipRecap" = "Skip Recap";
+"Player.SkipCredits" = "Skip Credits";
+"Player.SkipPreview" = "Skip Preview";

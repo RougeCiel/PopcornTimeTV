@@ -25,6 +25,11 @@ import Foundation
 ///   An earlier card only offers the skip earlier: the countdown runs to
 ///   the end of the file, and the next episode starts there (or on « Play
 ///   Now »).
+/// - Credits known (5.6.0: a chapter « Credits » / « Ending » that ends the
+///   file, `IntroMarkers.creditsStart`, `useCredits`): the card comes where
+///   they start, and its countdown runs `cardLead` seconds from there (at
+///   most to the end of the file) — the next episode starts during the
+///   credits, as on the streaming services.
 /// - The setting « Autoplay next episode » off: the card has no countdown,
 ///   nothing starts on its own.
 /// - The countdown of `offered` is the file's own time: a pause freezes it.
@@ -144,6 +149,11 @@ public struct UpNextCountdown: Equatable {
     public private(set) var sawActivity = false
     public private(set) var prefetchAt: TimeInterval?
     public private(set) var cardAt: TimeInterval?
+    /// Where the countdown ends and the next episode starts: the end of the
+    /// file, or `cardLead` after the credits start (`useCredits`).
+    public private(set) var countdownEnd: TimeInterval?
+    /// Where the credits that end the file start (`useCredits`).
+    public private(set) var creditsStart: TimeInterval?
     public private(set) var duration: TimeInterval?
     public private(set) var position: TimeInterval = 0
     /// The file played to its end.
@@ -168,8 +178,9 @@ public struct UpNextCountdown: Equatable {
     public var card: Card? {
         func countdown(_ left: Int?) -> Card {
             guard autoAdvance, let duration = duration else { return Card(kind: .countdown, secondsLeft: nil, total: nil) }
-            let total = Int((duration - (cardAt ?? duration)).rounded(.up))
-            return Card(kind: .countdown, secondsLeft: left ?? max(0, Int((duration - position).rounded(.up))), total: max(total, 1))
+            let end = countdownEnd ?? duration
+            let total = Int((end - (cardAt ?? end)).rounded(.up))
+            return Card(kind: .countdown, secondsLeft: left ?? max(0, Int((end - position).rounded(.up))), total: max(total, 1))
         }
         switch phase {
         case .offered:
@@ -224,6 +235,10 @@ public struct UpNextCountdown: Equatable {
                 phase = plan == .ready ? .ready : .preparing
             } else if isAtEnd {
                 effects += fileEnded()
+            } else if autoAdvance, let end = countdownEnd, let duration = duration, end < duration,
+                      self.position >= end {
+                // The countdown over the credits ran out.
+                effects += due(.deadline)
             } else if self.position + 2 < previous {
                 sawActivity = true
             }
@@ -345,6 +360,24 @@ public struct UpNextCountdown: Equatable {
         return []
     }
 
+    /// The credits that end the file start at `start` (seconds; nil: none
+    /// known): the card comes there (see the type's notes). Taken while the
+    /// card is not up yet; a start outside the file, or more than
+    /// `maxCreditsLength` before its end, is ignored.
+    public mutating func useCredits(at start: TimeInterval?) {
+        switch phase {
+        case .idle, .armed, .preparing, .ready: break
+        default: return
+        }
+        let valid = start.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        guard valid != creditsStart else { return }
+        creditsStart = valid
+        if let duration = duration { rearm(duration) }
+    }
+
+    /// The longest credits the card follows.
+    public static let maxCreditsLength: TimeInterval = 15 * 60
+
     /// The player closed (the user left it): nothing starts.
     public mutating func closed() {
         phase = .closed
@@ -354,10 +387,25 @@ public struct UpNextCountdown: Equatable {
 
     private mutating func arm(_ duration: TimeInterval) {
         guard self.duration != duration else { return }
+        rearm(duration)
+    }
+
+    private mutating func rearm(_ duration: TimeInterval) {
         self.duration = duration
         let lead = UpNextCountdown.effectiveCardLead(tuning.cardLead, duration: duration, maxFraction: tuning.cardLeadMaxFraction)
-        let card = tuning.cardAtOverride.map { min($0, duration) } ?? max(0, duration - lead)
+        var card = max(0, duration - lead)
+        var end = duration
+        if let credits = creditsStart, credits < duration - tuning.endTolerance,
+           duration - credits <= UpNextCountdown.maxCreditsLength {
+            card = credits
+            end = min(duration, credits + max(lead, 1))
+        }
+        if let override = tuning.cardAtOverride {
+            card = min(override, duration)
+            end = duration
+        }
         cardAt = card
+        countdownEnd = end
         prefetchAt = min(max(0, min(duration * tuning.prefetchFraction, duration - tuning.prefetchLead)), card)
         if phase == .idle { phase = .armed }
     }

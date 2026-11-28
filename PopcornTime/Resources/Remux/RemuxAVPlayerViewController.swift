@@ -196,6 +196,12 @@ final class RemuxAVPlayerViewController: AVPlayerViewController {
     /// user chose to play natively.
     private var pendingPlaylistURL: URL?
 
+    /// « Skip Intro / Recap / Credits » (`SkipMarkerWatch`): the file's
+    /// markers, fed by the 1 Hz tick; the button is AVKit's contextual
+    /// action on tvOS, the SwiftUI overlay of the player screen on iOS.
+    private var skipWatch: SkipMarkerWatch?
+    private var skipSubscription: AnyCancellable?
+
     /// tvOS "Up Next": the episode proposed near the end, and how to play it.
     private var nextEpisode: Episode?
     private var onPlayNext: ((Episode) -> Void)?
@@ -403,7 +409,10 @@ final class RemuxAVPlayerViewController: AVPlayerViewController {
         route = PlaybackRouting.route(forFileName: fileName)
         print("[Player] \(fileName) → \(route)")
         releaseNames = SubtitleFileContext.releaseNames(ofFile: localFile)
-        if route != .vlc { startHashLookup(localFile: localFile, streamer: streamer) }
+        if route != .vlc {
+            startHashLookup(localFile: localFile, streamer: streamer)
+            startSkipMarkers(localFile: localFile)
+        }
         switch route {
         case .remux:
             // A payload still downloading: the conversion reads it in file
@@ -2321,6 +2330,13 @@ final class RemuxAVPlayerViewController: AVPlayerViewController {
         upNextCardSubscription = nil
 #endif
         if !isHandingOff { saveProgress(status: .finished) }
+        // A hand-off to VLC keeps the watch: VLC plays the same file.
+        if !isHandingOff { skipWatch?.stop() }
+        skipSubscription = nil
+        skipWatch = nil
+#if os(tvOS)
+        contextualActions = []
+#endif
         let closedAt = String(format: "%.1f", player?.currentTime().seconds ?? .nan)
         isTornDown = true
         hashLookup?.stop()
@@ -2529,6 +2545,7 @@ final class RemuxAVPlayerViewController: AVPlayerViewController {
         rebuildLiveBornItemIfEnded()
         rebuildForLateSubtitlesIfDue()
         rebuildForRetimedSubtitlesIfDue()
+        skipMarkersTick()
 #if os(tvOS)
         upNextTick()
 #endif
@@ -3355,6 +3372,47 @@ extension RemuxAVPlayerViewController {
         // ticks, and the card would stay up over « Reprise à … ».
         upNextTick()
 #endif
+    }
+
+    // MARK: « Skip Intro »
+
+    private func startSkipMarkers(localFile: URL) {
+        let watch = SkipMarkerWatch.watch(for: localFile, media: media)
+        skipWatch = watch
+        watch.attach { [weak self] target in self?.skipMarkerSeek(to: target) }
+#if os(tvOS)
+        // AVKit's contextual action: the « Skip Intro » button at the
+        // bottom right, focused while the transport bar is hidden.
+        skipSubscription = watch.$active.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] marker in
+            guard let self = self, !self.isTornDown else { return }
+            self.contextualActions = marker.map { marker in
+                [UIAction(title: marker.kind.buttonTitle, image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
+                    self?.skipWatch?.skip()
+                }]
+            } ?? []
+        }
+#endif
+    }
+
+    /// 1 Hz: where the file is, to the skip markers (a navigation still
+    /// pending counts at its target).
+    private func skipMarkersTick() {
+        guard let watch = skipWatch, !isTornDown, !fallbackRequested, !isHandingOff,
+              let item = player?.currentItem, item.status == .readyToPlay,
+              let position = wantedPosition() else { return }
+        var duration: Double? = item.duration.seconds
+        if let known = duration, !known.isFinite || known <= 0 { duration = nil }
+        if duration == nil, route == .remux, let total = remux?.session?.totalDurationSeconds, total > 0 { duration = total }
+        watch.tick(position: position, duration: duration)
+    }
+
+    /// The skip button: a move like the user's (bounded storage, a jump's
+    /// wait, the « next episode » card hear it).
+    private func skipMarkerSeek(to target: Double) {
+        guard !isTornDown, !fallbackRequested, let player = player else { return }
+        let from = player.currentTime().seconds
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        noteUserNavigation(from: from, to: target)
     }
 
     /// `PlaybackStarvationRecovery.onNavigatedDuringRebuild`: the user moved
