@@ -670,6 +670,29 @@
 "Profiles.Use.Busy" = "Available once the open sheet is closed.";
 /* The profile editor: the profile was deleted meanwhile (another window). */
 "Profiles.Error.Gone" = "This profile no longer exists.";
+"Profiles.Kid" = "Kids Profile";
+"Profiles.Kid.Footer" = "Only titles rated up to the maximum rating are shown: on the Home, in Movies and Shows, in Search and in More Like This. A title without a rating is hidden. Ratings come from the sources and from TMDB with your TMDB key; without a key, few titles are rated. Manage Profiles is not offered in a kids profile.";
+"Profiles.MaxRating" = "Maximum Rating";
+"Profiles.MaxRating.G" = "All Ages (G, TV-Y, TV-G)";
+"Profiles.MaxRating.G.Short" = "All Ages";
+"Profiles.MaxRating.PG" = "Up to PG (TV-Y7, TV-PG)";
+"Profiles.MaxRating.PG13" = "Up to PG-13 (TV-14)";
+"Profiles.On" = "On";
+"Profiles.Off" = "Off";
+"Profiles.PIN" = "Profile PIN";
+"Profiles.PIN.Add" = "Add PIN…";
+"Profiles.PIN.Change" = "Change PIN…";
+"Profiles.PIN.Remove" = "Remove PIN";
+"Profiles.PIN.Footer" = "A 4-digit PIN is asked before this profile is opened, edited or deleted.";
+"Profiles.PIN.Enter" = "Enter %@’s PIN";
+"Profiles.PIN.New" = "Choose a 4-digit PIN";
+"Profiles.PIN.Confirm" = "Enter the PIN again";
+"Profiles.PIN.Wrong" = "Wrong PIN. Try again.";
+"Profiles.PIN.Mismatch" = "The PINs don’t match. Try again.";
+"Profiles.PIN.DeleteDigit" = "Delete";
+"Profiles.PIN.LockedValue" = "Locked";
+"Profiles.ValueFormat" = "%1$@: %2$@";
+"Profiles.Error.InvalidPIN" = "A PIN is 4 digits.";
 /* 5.4.0 review-fixes-2 */
 /* Settings › Audio / Subtitle Language: the choice that follows the language the profile picks itself (the key never set). */
 "Settings.Language.Automatic" = "Automatic";

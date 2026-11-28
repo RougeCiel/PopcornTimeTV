@@ -51,19 +51,25 @@ enum ProfilesPresenter {
     /// only closes it — Settings is as it was.
     static func present(from presenter: UIViewController) {
         let before = ProfileManager.shared.activeID
+        let restrictionBefore = ProfileManager.shared.active.restriction
         weak var host: UIViewController?
         let view = ProfilePickerView(onPick: { profile in
-            if profile.id == before {
+            if profile.id == before && ProfileManager.shared.active.restriction == restrictionBefore {
                 host?.dismiss(animated: true)
+            } else if profile.id == before {
+                rebuildInterface()
             } else {
                 ProfileManager.shared.activate(profile.id)
                 rebuildInterface()
             }
         }, onCancel: {
             host?.dismiss(animated: true)
-            // Managing may have deleted the active profile: the primary one
-            // is active then, and the interface must follow.
-            if ProfileManager.shared.activeID != before { rebuildInterface() }
+            // Managing may have deleted the active profile (the primary one
+            // is active then), or made it a kids profile or no longer one:
+            // the interface must follow.
+            if ProfileManager.shared.activeID != before || ProfileManager.shared.active.restriction != restrictionBefore {
+                rebuildInterface()
+            }
         })
         let controller = UIHostingController(rootView: view)
         controller.view.backgroundColor = .black

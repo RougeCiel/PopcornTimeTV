@@ -670,6 +670,29 @@
 "Profiles.Use.Busy" = "Disponible une fois la fenêtre ouverte refermée.";
 /* The profile editor: the profile was deleted meanwhile (another window). */
 "Profiles.Error.Gone" = "Ce profil n’existe plus.";
+"Profiles.Kid" = "Profil Enfant";
+"Profiles.Kid.Footer" = "Seuls les titres classés jusqu’à la classification maximale sont proposés : à l’Accueil, dans Films et Séries, dans la Recherche et dans Titres similaires. Un titre sans classification est masqué. Les classifications viennent des sources et de TMDB avec votre clé TMDB ; sans clé, peu de titres sont classés. Gérer les profils n’est pas proposé dans un profil Enfant.";
+"Profiles.MaxRating" = "Classification maximale";
+"Profiles.MaxRating.G" = "Tous publics (G, TV-Y, TV-G)";
+"Profiles.MaxRating.G.Short" = "Tous publics";
+"Profiles.MaxRating.PG" = "Jusqu’à PG (TV-Y7, TV-PG)";
+"Profiles.MaxRating.PG13" = "Jusqu’à PG-13 (TV-14)";
+"Profiles.On" = "Oui";
+"Profiles.Off" = "Non";
+"Profiles.PIN" = "Code PIN";
+"Profiles.PIN.Add" = "Ajouter un code PIN…";
+"Profiles.PIN.Change" = "Modifier le code PIN…";
+"Profiles.PIN.Remove" = "Supprimer le code PIN";
+"Profiles.PIN.Footer" = "Un code PIN à 4 chiffres est demandé avant d’ouvrir, de modifier ou de supprimer ce profil.";
+"Profiles.PIN.Enter" = "Saisissez le code PIN de %@";
+"Profiles.PIN.New" = "Choisissez un code PIN à 4 chiffres";
+"Profiles.PIN.Confirm" = "Saisissez le code PIN à nouveau";
+"Profiles.PIN.Wrong" = "Code PIN incorrect. Réessayez.";
+"Profiles.PIN.Mismatch" = "Les codes PIN ne correspondent pas. Réessayez.";
+"Profiles.PIN.DeleteDigit" = "Effacer";
+"Profiles.PIN.LockedValue" = "Verrouillé";
+"Profiles.ValueFormat" = "%1$@ : %2$@";
+"Profiles.Error.InvalidPIN" = "Un code PIN compte 4 chiffres.";
 /* 5.4.0 review-fixes-2 */
 /* Settings › Audio / Subtitle Language: the choice that follows the language the profile picks itself (the key never set). */
 "Settings.Language.Automatic" = "Automatique";

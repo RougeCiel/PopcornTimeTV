@@ -43,7 +43,7 @@ public extension Movie {
         largeCoverImage = shown.largeCoverImage ?? record.largeCoverImage
         crew = shown.crew.isEmpty ? record.crew : shown.crew
         actors = shown.actors.isEmpty ? record.actors : shown.actors
-        related = shown.related.isEmpty ? record.related : shown.related
+        related = DetailMerge.admitted(shown.related.isEmpty ? record.related : shown.related)
         torrents = record.torrents
         subtitles = shown.subtitles.isEmpty ? record.subtitles : shown.subtitles
         genres = shown.genres.isEmpty ? record.genres : shown.genres
@@ -86,7 +86,7 @@ public extension Show {
         largeCoverImage = shown.largeCoverImage ?? record.largeCoverImage
         crew = shown.crew.isEmpty ? record.crew : shown.crew
         actors = shown.actors.isEmpty ? record.actors : shown.actors
-        related = shown.related.isEmpty ? record.related : shown.related
+        related = DetailMerge.admitted(shown.related.isEmpty ? record.related : shown.related)
         episodes = record.episodes
         genres = shown.genres.isEmpty ? record.genres : shown.genres
         releaseDate = shown.releaseDate ?? record.releaseDate
@@ -128,6 +128,30 @@ enum DetailMerge {
         guard isSummary(record) else { return shown }
         guard isSummary(shown) else { return record }
         return isCut(shown) && !isCut(record) ? record : shown
+    }
+
+    /// A kids profile's « More Like This »: the titles rated for it
+    /// (`ContentRestriction`); every title for another profile.
+    static func admitted(_ movies: [Movie], restriction: ContentRestriction? = ContentRestriction.current) -> [Movie] {
+        return restriction?.admitted(movies) ?? movies
+    }
+
+    static func admitted(_ shows: [Show], restriction: ContentRestriction? = ContentRestriction.current) -> [Show] {
+        return restriction?.admitted(shows) ?? shows
+    }
+
+    /// `completion` given the titles a kids profile may see, once the
+    /// ratings they lack were asked; unchanged for another profile.
+    static func admittingRelated<T: Media>(_ completion: @escaping ([T]) -> Void,
+                                           restriction: ContentRestriction? = ContentRestriction.current) -> ([T]) -> Void {
+        guard let restriction else { return completion }
+        return { related in
+            let store = ContentRatingStore.shared
+            let missing = ContentRestriction.unrated(related.map { ($0.id, ($0 as? Movie)?.certification) }, store: store)
+            store.resolve(missing, timeout: ContentRatingStore.listWait) {
+                completion(related.filter { restriction.admits(imdbId: $0.id, certification: ($0 as? Movie)?.certification, store: store) })
+            }
+        }
     }
 
     /// "PG-13", not the models' "Unrated" default.

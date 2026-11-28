@@ -63,6 +63,8 @@ open class MovieManager: NetworkManager {
      Search Movies (page 1 of `load` with `searchTerm`), on the main queue. `incomplete`: a source was left out of the answer (late or down), so an empty list is « nothing found yet », and the same query is worth sending again.
      */
     public func search(_ term: String, completion: @escaping ([Movie]?, NSError?, _ incomplete: Bool) -> Void) {
+        // A kids profile: the titles rated for it (`ContentRestriction`).
+        let completion = ContentRestriction.restrictingSearch(completion) { $0.admit($1, completion: $2) }
         let provider = MediaProviders.shared
         provider.loadMovies(page: 1, filter: .popularity, genre: .all, searchTerm: term, order: .descending) { movies, error in
             // Read here, inside the completion, as `load` does.
@@ -85,6 +87,12 @@ open class MovieManager: NetworkManager {
         orderBy order: Orders,
         snapshot: (([Movie]) -> Void)?,
         completion: @escaping ([Movie]?, NSError?) -> Void) {
+        // A kids profile: the titles rated for it (`ContentRestriction`),
+        // filtered after the snapshot store — the saved list is every
+        // profile's.
+        let (snapshot, completion) = ContentRestriction.restricting(snapshot: snapshot, completion: completion) {
+            $0.admit($1, completion: $2)
+        }
         print("[MovieManager] load page=\(page) filter=\(filter) genre=\(genre) -> provider=\(type(of: MediaProviders.shared))")
         let network: (@escaping ([Movie]?, NSError?, _ partial: Bool) -> Void) -> Void = { done in
             let provider = MediaProviders.shared

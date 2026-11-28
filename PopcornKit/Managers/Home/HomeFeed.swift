@@ -147,6 +147,12 @@ public final class HomeFeed: @unchecked Sendable {
     private let now: () -> Date
     let rules: HomeBuilder.Rules
 
+    /// The active profile's restriction when it is a kids one: the page
+    /// shows only the titles rated for it. Read at each build (any queue).
+    /// None by default (the Top Shelf, the tests); `followActiveProfile`
+    /// sets the app's.
+    public var contentRestriction: @Sendable () -> ContentRestriction? = { nil }
+
     // Main queue only.
     private var mainHooks: HomeLocalHooks
     private var mainOnUpdate: ((HomeSnapshot) -> Void)?
@@ -453,7 +459,15 @@ public final class HomeFeed: @unchecked Sendable {
                                   service: options.servicesRow ? settings.homeService : nil,
                                   region: settings.streamingRegion,
                                   allServicesTitle: Bundle.main.localizedString(forKey: "All", value: "All", table: nil),
-                                  pending: pending, now: now())
+                                  pending: pending, now: now(), admits: admits())
+    }
+
+    /// A kids profile's filter (`ContentRestriction`): a title not rated yet
+    /// is asked for, and the page is made again once ratings come
+    /// (`followActiveProfile`).
+    private func admits() -> (@Sendable (HomeItem) -> Bool)? {
+        guard let restriction = contentRestriction() else { return nil }
+        return { item in restriction.admits(imdbId: item.imdbId) }
     }
 
     private func currentInputs() -> HomeBuilder.Inputs {

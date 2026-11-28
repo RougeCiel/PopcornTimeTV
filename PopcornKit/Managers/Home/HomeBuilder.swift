@@ -116,6 +116,9 @@ enum HomeBuilder {
         /// meanwhile: it would be shown, then swapped a moment later.
         var pending: Set<String> = []
         var now: Date
+        /// A kids profile: whether a title may be shown (`ContentRestriction`).
+        /// nil: every title.
+        var admits: (@Sendable (HomeItem) -> Bool)?
 
         /// The sources this build reads: the same plan the loader asks.
         func plan(rules: Rules = Rules()) -> HomePlan {
@@ -134,9 +137,17 @@ enum HomeBuilder {
         let context = Context(inputs: inputs, rules: rules)
         var drafts: [Draft] = []
 
+        // A kids profile: only the titles rated for it, on every shelf (the
+        // « Services » row holds no title).
+        let admitted = { (draft: Draft?) -> Draft? in
+            guard var draft, let admits = inputs.admits else { return draft }
+            draft.entries.removeAll { !HomeServiceCard.isServiceCard($0.item) && !admits($0.item) }
+            return draft
+        }
+
         // Filtered on a service: its row, then its shelves only.
         if let service = inputs.service {
-            let streaming = context.streaming(service)
+            let streaming = context.streaming(service).compactMap(admitted)
             if !inputs.hidden.contains(HomeShelfID.hero), let hero = context.streamingHero(streaming) { drafts.append(hero) }
             drafts.append(context.servicesRow())
             drafts += streaming
@@ -145,8 +156,8 @@ enum HomeBuilder {
             return shelves
         }
 
-        var trendingMovies = context.trendingMovies()
-        var trendingShows = context.trendingShows()
+        var trendingMovies = admitted(context.trendingMovies())
+        var trendingShows = admitted(context.trendingShows())
         if !inputs.hidden.contains(HomeShelfID.hero),
            let hero = context.hero(movies: trendingMovies, shows: trendingShows) {
             // What the hero shows is not repeated right under it.
@@ -167,6 +178,7 @@ enum HomeBuilder {
         ].compactMap { $0 }
         drafts.append(Draft(HomeShelfID.watchlist, inputs.local.watchlist.map { HomeEntry(item: $0) }))
         drafts += context.genres()
+        drafts = drafts.compactMap(admitted)
         // « For You »: the page's own titles the profile should like most,
         // right under what it is watching.
         if let forYou = context.forYou(from: drafts) { drafts.insert(forYou, at: forYouIndex) }

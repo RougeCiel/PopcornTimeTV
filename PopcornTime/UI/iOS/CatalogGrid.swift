@@ -50,7 +50,12 @@ final class CatalogGridModel<Item: CatalogItem, Filter: CatalogFilter>: Observab
                         _ snapshot: (([Item]) -> Void)?,
                         _ completion: @escaping ([Item]?, NSError?) -> Void) -> Void
 
-    @Published private(set) var pager = CatalogPager<Item> { $0.id }
+    @Published private(set) var pager: CatalogPager<Item> = {
+        // A kids profile's pages may come back empty (`isRestricted`).
+        var pager = CatalogPager<Item> { $0.id }
+        pager.isRestricted = ContentRestriction.current != nil
+        return pager
+    }()
     @Published private(set) var filter: Filter
     @Published private(set) var genre: NetworkManager.Genres
 

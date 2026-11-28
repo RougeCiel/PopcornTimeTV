@@ -975,6 +975,29 @@
 "Profiles.Use.Busy" = "Disponível depois que a janela aberta for fechada.";
 /* The profile editor: the profile was deleted meanwhile (another window). */
 "Profiles.Error.Gone" = "Este perfil não existe mais.";
+"Profiles.Kid" = "Perfil infantil";
+"Profiles.Kid.Footer" = "Só são mostrados os títulos classificados até a classificação máxima: no Início, em Filmes e Séries, na Busca e em Títulos semelhantes. Um título sem classificação fica oculto. As classificações vêm das fontes e do TMDB com sua chave do TMDB; sem chave, poucos títulos são classificados. Gerenciar perfis não é oferecido em um perfil infantil.";
+"Profiles.MaxRating" = "Classificação máxima";
+"Profiles.MaxRating.G" = "Livre (G, TV-Y, TV-G)";
+"Profiles.MaxRating.G.Short" = "Livre";
+"Profiles.MaxRating.PG" = "Até PG (TV-Y7, TV-PG)";
+"Profiles.MaxRating.PG13" = "Até PG-13 (TV-14)";
+"Profiles.On" = "Sim";
+"Profiles.Off" = "Não";
+"Profiles.PIN" = "PIN do perfil";
+"Profiles.PIN.Add" = "Adicionar PIN…";
+"Profiles.PIN.Change" = "Alterar PIN…";
+"Profiles.PIN.Remove" = "Remover PIN";
+"Profiles.PIN.Footer" = "Um PIN de 4 dígitos é pedido antes de abrir, editar ou apagar este perfil.";
+"Profiles.PIN.Enter" = "Digite o PIN de %@";
+"Profiles.PIN.New" = "Escolha um PIN de 4 dígitos";
+"Profiles.PIN.Confirm" = "Digite o PIN novamente";
+"Profiles.PIN.Wrong" = "PIN incorreto. Tente novamente.";
+"Profiles.PIN.Mismatch" = "Os PINs não coincidem. Tente novamente.";
+"Profiles.PIN.DeleteDigit" = "Apagar";
+"Profiles.PIN.LockedValue" = "Bloqueado";
+"Profiles.ValueFormat" = "%1$@: %2$@";
+"Profiles.Error.InvalidPIN" = "Um PIN tem 4 dígitos.";
 /* 5.4.0 review-fixes-2 */
 /* Settings › Audio / Subtitle Language: the choice that follows the language the profile picks itself (the key never set). */
 "Settings.Language.Automatic" = "Automático";

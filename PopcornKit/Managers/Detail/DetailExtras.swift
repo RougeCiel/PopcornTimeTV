@@ -10,6 +10,8 @@ public enum DetailExtras {
 
     /// Titles to suggest next to `media`, on the main queue.
     public static func related<T: Media>(_ media: T, completion: @escaping ([T]) -> Void) {
+        // A kids profile: the titles rated for it.
+        let completion = DetailMerge.admittingRelated(completion)
         guard TraktManager.shared.isSignedIn(), !TraktManager.anonymousAccessRefused else {
             return OpenMetadata.related(media) { related in completion(related.compactMap { $0 as? T }) }
         }

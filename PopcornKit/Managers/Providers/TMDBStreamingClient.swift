@@ -191,7 +191,9 @@ public final class TMDBStreamingClient: @unchecked Sendable {
             self.withImdbIds(results, kind: kind) { resolved, failed in
                 guard failed == 0 else { return completion(nil, false) }
                 let items = resolved.compactMap { HomeParse.tmdbEntry($0, kind: kind)?.item }
-                completion(items, page < min(pages, TMDBStreamingClient.lastPage))
+                let hasMore = page < min(pages, TMDBStreamingClient.lastPage)
+                // A kids profile: the titles rated for it.
+                ContentRestriction.admit(items) { completion($0, hasMore) }
             }
         }
     }

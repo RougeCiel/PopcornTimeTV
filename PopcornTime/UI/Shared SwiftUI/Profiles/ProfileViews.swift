@@ -385,10 +385,19 @@ final class ProfilesModel: ObservableObject {
     /// nil when saved; else the text to show.
     func save(_ draft: ProfileDraft) -> String? {
         do {
-            if let id = draft.id {
-                try manager.update(id, name: draft.name, avatar: draft.avatar)
+            let id: String
+            if let existing = draft.id {
+                try manager.update(existing, name: draft.name, avatar: draft.avatar,
+                                   isKid: draft.isKid, maxRating: draft.maxRating)
+                id = existing
             } else {
-                try manager.create(name: draft.name, avatar: draft.avatar)
+                id = try manager.create(name: draft.name, avatar: draft.avatar,
+                                        isKid: draft.isKid, maxRating: draft.maxRating).id
+            }
+            switch draft.pin {
+            case .keep: break
+            case .set(let pin): try manager.setPIN(pin, for: id)
+            case .remove: try manager.setPIN(nil, for: id)
             }
             reload()
             return nil
@@ -414,23 +423,62 @@ final class ProfilesModel: ObservableObject {
         // Deleted meanwhile (another window of the Mac): the editor closes
         // as soon as it sees it; this is for a save that came first.
         case .unknownProfile: return profilesLocalized("Profiles.Error.Gone")
+        case .invalidPIN: return profilesLocalized("Profiles.Error.InvalidPIN")
         }
     }
 }
 
 /// What the editor changes: a new profile (`id` nil) or an existing one.
 struct ProfileDraft: Identifiable, Equatable {
+    /// What Save does to the profile's PIN.
+    enum PINChange: Equatable {
+        case keep
+        case set(String)
+        case remove
+    }
+
     var id: String?
     var name: String
     var avatar: Int
+    var isKid = false
+    var maxRating = ContentRating.default
+    var pin = PINChange.keep
+    /// The profile had a PIN when the editor opened.
+    var hadPIN = false
     var isPrimary: Bool { id == Profile.primaryID }
 
     var identity: String { id ?? "new" }
+
+    /// The profile will have a PIN once saved.
+    var hasPIN: Bool {
+        switch pin {
+        case .keep: return hadPIN
+        case .set: return true
+        case .remove: return false
+        }
+    }
 }
 
 extension ProfileDraft {
     static func editing(_ profile: Profile) -> ProfileDraft {
-        ProfileDraft(id: profile.id, name: profile.name, avatar: profile.avatar)
+        ProfileDraft(id: profile.id, name: profile.name, avatar: profile.avatar,
+                     isKid: profile.isKid, maxRating: profile.maxRating, hadPIN: profile.hasPIN)
+    }
+}
+
+/// The highest rating of a kids profile, as the editor names it.
+enum ProfileRatingText {
+    static func name(_ rating: ContentRating) -> String {
+        switch rating {
+        case .allAges: return profilesLocalized("Profiles.MaxRating.G")
+        case .pg: return profilesLocalized("Profiles.MaxRating.PG")
+        case .pg13: return profilesLocalized("Profiles.MaxRating.PG13")
+        }
+    }
+
+    /// Short, for the Apple TV's button: « PG-13 ».
+    static func short(_ rating: ContentRating) -> String {
+        rating == .allAges ? profilesLocalized("Profiles.MaxRating.G.Short") : rating.rawValue
     }
 }
 
@@ -460,6 +508,8 @@ struct ProfilePickerView: View {
 
     @State private var managing = false
     @State private var draft: ProfileDraft?
+    /// A protected profile pressed: its PIN is asked first.
+    @State private var pinRequest: ProfilePINRequest?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(tvOS)
     @FocusState private var focusedTile: String?
@@ -495,7 +545,7 @@ struct ProfilePickerView: View {
     }
 
     private var items: [Item] {
-        model.profiles.map(Item.profile) + (model.canAdd ? [.add] : [])
+        model.profiles.map(Item.profile) + (model.canAdd && !isLockedDown ? [.add] : [])
     }
 
     var body: some View {
@@ -518,9 +568,17 @@ struct ProfilePickerView: View {
             // Elsewhere it leaves Manage mode first, then closes.
             .onExitCommand(perform: managing || onCancel != nil ? { exit() } : nil)
             .fullScreenCover(item: $draft) { editor($0) }
+            .fullScreenCover(item: $pinRequest) { pinView($0) }
             #else
             .sheet(item: $draft) { editor($0) }
+            .background { Color.clear.sheet(item: $pinRequest) { pinView($0) } }
             #endif
+    }
+
+    /// Opened from a kids profile (Settings, the menu): it cannot manage
+    /// the profiles nor add one — it can only switch.
+    private var isLockedDown: Bool {
+        onCancel != nil && (model.active?.isKid ?? false)
     }
 
     private var title: some View {
@@ -695,6 +753,9 @@ struct ProfilePickerView: View {
                     ProfileAvatarView(avatar: profile.avatar, size: metrics.tile, showsSymbol: !managing)
                         .opacity(managing ? 0.4 : 1)
                         .overlay { if managing { ProfileEditMark(size: metrics.tile) } }
+                        .overlay(alignment: .bottomTrailing) {
+                            if profile.hasPIN { ProfileLockMark(size: metrics.tile) }
+                        }
                 }
             }
             .buttonStyle(ProfileTileStyle())
@@ -704,7 +765,10 @@ struct ProfilePickerView: View {
             .accessibilityLabel(Text(verbatim: managing
                                      ? String(format: profilesLocalized("Profiles.EditNamed"), profile.name)
                                      : profile.name))
-            .accessibilityValue(Text(verbatim: isCurrent ? profilesLocalized("Profiles.CurrentValue") : ""))
+            .accessibilityValue(Text(verbatim: [isCurrent ? profilesLocalized("Profiles.CurrentValue") : "",
+                                                profile.hasPIN ? profilesLocalized("Profiles.PIN.LockedValue") : "",
+                                                profile.isKid ? profilesLocalized("Profiles.Kid") : ""]
+                .filter { !$0.isEmpty }.joined(separator: ", ")))
             .accessibilityAddTraits(isCurrent ? .isSelected : [])
             .accessibilityIdentifier("Profiles.Profile.\(profile.name)")
         case .add:
@@ -721,7 +785,8 @@ struct ProfilePickerView: View {
         }
     }
 
-    /// Manage Profiles, or Done in Manage mode: text only.
+    /// Manage Profiles, or Done in Manage mode: text only. Not offered to
+    /// a kids profile (`isLockedDown`).
     private var manageButton: some View {
         SwiftUI.Button {
             managing.toggle()
@@ -729,6 +794,9 @@ struct ProfilePickerView: View {
             Text(profilesLocalized(managing ? "Profiles.Done" : "Profiles.Manage"))
                 .lineLimit(1)
         }
+        .disabled(isLockedDown)
+        .opacity(isLockedDown ? 0 : 1)
+        .accessibilityHidden(isLockedDown)
         #if os(iOS)
         // Neutral glass, white words: the app's red tint is kept for what
         // deletes. (Not on the Mac: its glass button fills its capsule with
@@ -740,9 +808,34 @@ struct ProfilePickerView: View {
 
     private func press(_ profile: Profile) {
         if managing {
-            draft = .editing(profile)
+            // Editing or deleting a protected profile: its PIN first.
+            if profile.hasPIN {
+                pinRequest = ProfilePINRequest(profile: profile, purpose: .edit)
+            } else {
+                draft = .editing(profile)
+            }
+        } else if profile.hasPIN && (!marksCurrent || profile.id != model.activeID) {
+            // Opening it: its PIN first — not when the picker opened to
+            // switch is closed on the profile already in use.
+            pinRequest = ProfilePINRequest(profile: profile, purpose: .open)
         } else {
             onPick(profile)
+        }
+    }
+
+    private func pinView(_ request: ProfilePINRequest) -> some View {
+        ProfilePINView(mode: .verify(request.profile),
+                       check: { model.manager.checkPIN($0, for: request.profile.id) }) { pin in
+            pinRequest = nil
+            guard pin != nil else { return }
+            switch request.purpose {
+            case .open: onPick(request.profile)
+            case .edit:
+                // After the PIN's cover has gone: one presentation at a time.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    draft = model.profiles.first { $0.id == request.profile.id }.map(ProfileDraft.editing)
+                }
+            }
         }
     }
 
@@ -754,6 +847,279 @@ struct ProfilePickerView: View {
 
     private func editor(_ draft: ProfileDraft) -> some View {
         ProfileEditorView(model: model, draft: draft) { self.draft = nil }
+    }
+}
+
+// MARK: - PIN
+
+/// A protected profile pressed in « Who's Watching? »: its PIN is asked
+/// before it opens (`open`) or before its editor does (`edit`: editing,
+/// deleting).
+struct ProfilePINRequest: Identifiable {
+    enum Purpose {
+        case open
+        case edit
+    }
+
+    let profile: Profile
+    let purpose: Purpose
+    var id: String { profile.id }
+}
+
+/// A padlock on a protected profile's circle.
+private struct ProfileLockMark: View {
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(Color.black.opacity(0.7))
+            .overlay { Circle().strokeBorder(Color.white.opacity(0.3), lineWidth: 1) }
+            .overlay {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: size * 0.12, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: size * 0.28, height: size * 0.28)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Four digits on a keypad: a protected profile's PIN (`verify`), or a new
+/// one typed twice (`choose`). The keypad is buttons, so the Apple TV's
+/// remote moves over it and selects; the Mac also takes the keyboard's
+/// digits and Delete. `onDone` gets the PIN, or nil (Cancel, Menu, Escape).
+struct ProfilePINView: View {
+    enum Mode {
+        case verify(Profile)
+        case choose
+    }
+
+    let mode: Mode
+    /// `verify`: whether the PIN typed is the profile's.
+    var check: (String) -> Bool = { _ in true }
+    let onDone: (String?) -> Void
+
+    @State private var digits = ""
+    /// `choose`: the first entry, waiting to be typed again.
+    @State private var firstEntry: String?
+    @State private var message: String?
+    @State private var attempts = 0
+    #if os(tvOS)
+    @FocusState private var focusedKey: Int?
+    #endif
+
+    private var title: String {
+        switch mode {
+        case .verify(let profile): return String(format: profilesLocalized("Profiles.PIN.Enter"), profile.name)
+        case .choose: return profilesLocalized(firstEntry == nil ? "Profiles.PIN.New" : "Profiles.PIN.Confirm")
+        }
+    }
+
+    var body: some View {
+        content
+            #if os(tvOS)
+            .onExitCommand { onDone(nil) }
+            .defaultFocus($focusedKey, 5)
+            #endif
+            #if os(macOS)
+            .focusable()
+            .focusEffectDisabled()
+            .onKeyPress(phases: .down) { press in
+                if let digit = Int(press.characters), press.characters.count == 1 {
+                    type(digit)
+                    return .handled
+                }
+                if press.key == .delete || press.key == .deleteForward {
+                    deleteLast()
+                    return .handled
+                }
+                return .ignored
+            }
+            #endif
+    }
+
+    private var content: some View {
+        ZStack {
+            ProfilesBackdrop(radius: metrics.backdrop).ignoresSafeArea()
+            VStack(spacing: metrics.spacing) {
+                if case .verify(let profile) = mode {
+                    ProfileAvatarView(avatar: profile.avatar, size: metrics.avatar)
+                } else {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: metrics.avatar * 0.4, weight: .medium))
+                        .foregroundStyle(GlassPalette.primaryText)
+                        .frame(height: metrics.avatar)
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: title)
+                    .font(.system(size: metrics.title, weight: .bold))
+                    .foregroundStyle(GlassPalette.primaryText)
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("Profiles.PIN.Title")
+                dots
+                Text(verbatim: message ?? " ")
+                    .font(.system(size: metrics.message, weight: .medium))
+                    .foregroundStyle(GlassPalette.accent)
+                    .accessibilityIdentifier("Profiles.PIN.Message")
+                    .accessibilityHidden(message == nil)
+                keypad
+            }
+            .padding(metrics.spacing)
+        }
+    }
+
+    private var dots: some View {
+        HStack(spacing: metrics.dot) {
+            ForEach(0..<ProfilePIN.length, id: \.self) { index in
+                Circle()
+                    .fill(index < digits.count ? GlassPalette.primaryText : Color.clear)
+                    .overlay { Circle().strokeBorder(GlassPalette.primaryText, lineWidth: 2) }
+                    .frame(width: metrics.dot, height: metrics.dot)
+            }
+        }
+        .modifier(ProfilePINShake(attempts: CGFloat(attempts)))
+        .accessibilityElement()
+        .accessibilityLabel(Text(verbatim: "\(digits.count) / \(ProfilePIN.length)"))
+        .accessibilityIdentifier("Profiles.PIN.Dots")
+    }
+
+    private var keypad: some View {
+        VStack(spacing: metrics.keyGap) {
+            ForEach(0..<3) { row in
+                HStack(spacing: metrics.keyGap) {
+                    ForEach(1...3, id: \.self) { column in key(row * 3 + column) }
+                }
+            }
+            HStack(spacing: metrics.keyGap) {
+                SwiftUI.Button { onDone(nil) } label: {
+                    Text(verbatim: profilesLocalized("Profiles.Cancel"))
+                        .font(.system(size: metrics.keyFont * 0.5, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .frame(width: metrics.key, height: metrics.keyHeight)
+                }
+                .modifier(ProfilePINKeyStyle())
+                #if os(macOS)
+                .keyboardShortcut(.cancelAction)
+                #endif
+                .accessibilityIdentifier("Profiles.PIN.Cancel")
+                key(0)
+                SwiftUI.Button(action: deleteLast) {
+                    Image(systemName: "delete.left")
+                        .font(.system(size: metrics.keyFont * 0.6, weight: .medium))
+                        .frame(width: metrics.key, height: metrics.keyHeight)
+                }
+                .modifier(ProfilePINKeyStyle())
+                .disabled(digits.isEmpty)
+                .accessibilityLabel(Text(verbatim: profilesLocalized("Profiles.PIN.DeleteDigit")))
+                .accessibilityIdentifier("Profiles.PIN.Delete")
+            }
+        }
+    }
+
+    private func key(_ digit: Int) -> some View {
+        SwiftUI.Button { type(digit) } label: {
+            Text(verbatim: "\(digit)")
+                .font(.system(size: metrics.keyFont, weight: .medium))
+                .monospacedDigit()
+                .frame(width: metrics.key, height: metrics.keyHeight)
+        }
+        .modifier(ProfilePINKeyStyle())
+        #if os(tvOS)
+        .focused($focusedKey, equals: digit)
+        #endif
+        .accessibilityIdentifier("Profiles.PIN.Key.\(digit)")
+    }
+
+    private func type(_ digit: Int) {
+        guard digits.count < ProfilePIN.length else { return }
+        digits.append(String(digit))
+        message = nil
+        guard digits.count == ProfilePIN.length else { return }
+        let typed = digits
+        // The fourth dot shows before the answer.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { complete(typed) }
+    }
+
+    private func deleteLast() {
+        guard !digits.isEmpty else { return }
+        digits.removeLast()
+    }
+
+    private func complete(_ typed: String) {
+        switch mode {
+        case .verify:
+            if check(typed) { return onDone(typed) }
+            fail(profilesLocalized("Profiles.PIN.Wrong"))
+        case .choose:
+            if let first = firstEntry {
+                if first == typed { return onDone(typed) }
+                firstEntry = nil
+                fail(profilesLocalized("Profiles.PIN.Mismatch"))
+            } else {
+                firstEntry = typed
+                digits = ""
+            }
+        }
+    }
+
+    private func fail(_ text: String) {
+        digits = ""
+        message = text
+        withAnimation(.default) { attempts += 1 }
+        #if os(iOS)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        #endif
+    }
+
+    private struct Metrics {
+        var backdrop: CGFloat, spacing: CGFloat, avatar: CGFloat, title: CGFloat, message: CGFloat
+        var dot: CGFloat, key: CGFloat, keyHeight: CGFloat, keyGap: CGFloat, keyFont: CGFloat
+    }
+
+    private var metrics: Metrics {
+        #if os(tvOS)
+        return Metrics(backdrop: 1100, spacing: 26, avatar: 120, title: 46, message: 26,
+                       dot: 28, key: 150, keyHeight: 84, keyGap: 22, keyFont: 40)
+        #elseif os(macOS)
+        return Metrics(backdrop: 600, spacing: 16, avatar: 64, title: 20, message: 13,
+                       dot: 14, key: 64, keyHeight: 40, keyGap: 10, keyFont: 20)
+        #else
+        return Metrics(backdrop: 700, spacing: 18, avatar: 72, title: 22, message: 15,
+                       dot: 16, key: 76, keyHeight: 76, keyGap: 18, keyFont: 30)
+        #endif
+    }
+}
+
+/// A key of the PIN pad: the system's focused platter on the Apple TV, a
+/// round glass key on the iPhone and iPad, a bordered button on the Mac.
+private struct ProfilePINKeyStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+        content.buttonStyle(.bordered)
+        #elseif os(macOS)
+        content.buttonStyle(.bordered).controlSize(.large)
+        #else
+        content
+            .buttonStyle(.plain)
+            .foregroundStyle(GlassPalette.primaryText)
+            .background(Circle().fill(Color.white.opacity(0.12)))
+            .contentShape(Circle())
+        #endif
+    }
+}
+
+/// The dots shake sideways at a wrong PIN.
+private struct ProfilePINShake: GeometryEffect {
+    var attempts: CGFloat
+    var animatableData: CGFloat {
+        get { attempts }
+        set { attempts = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: 10 * sin(attempts * .pi * 6), y: 0))
     }
 }
 
@@ -773,7 +1139,11 @@ struct ProfileEditorView: View {
     private let initial: ProfileDraft
     @State private var error: String?
     @State private var confirmDelete = false
+    /// A new PIN being typed (`ProfilePINView`, `choose`).
+    @State private var choosingPIN = false
     #if os(tvOS)
+    /// Change or remove the PIN (the Apple TV's PIN button).
+    @State private var pinActions = false
     private enum Field: Hashable { case name, save }
     @FocusState private var focus: Field?
     @Environment(\.glassSettingsFallback) private var fallback
@@ -800,7 +1170,7 @@ struct ProfileEditorView: View {
     }
 
     private var trimmedName: String { draft.name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var isDirty: Bool { draft.name != initial.name || draft.avatar != initial.avatar }
+    private var isDirty: Bool { draft != initial }
     /// Delete is offered for a profile saved before, other than the main one.
     private var isDeletable: Bool { draft.id != nil && !draft.isPrimary }
     private var title: String { profilesLocalized(draft.id == nil ? "Profiles.New" : "Profiles.Edit") }
@@ -811,6 +1181,12 @@ struct ProfileEditorView: View {
                 if name.count > ProfileManager.maxNameLength { draft.name = String(name.prefix(ProfileManager.maxNameLength)) }
                 error = nil
             }
+            .onChange(of: draft.isKid) { _, _ in error = nil }
+            #if os(tvOS)
+            .fullScreenCover(isPresented: $choosingPIN) { pinChooser }
+            #else
+            .sheet(isPresented: $choosingPIN) { pinChooser }
+            #endif
             // Deleted meanwhile (the Mac's other window, Settings): there is
             // nothing left to edit.
             .onChange(of: model.profiles) { _, profiles in
@@ -851,6 +1227,58 @@ struct ProfileEditorView: View {
         if let message = model.save(draft) { error = message } else { onClose() }
     }
 
+    /// A new PIN, typed twice: kept in the draft until Save.
+    private var pinChooser: some View {
+        ProfilePINView(mode: .choose) { pin in
+            choosingPIN = false
+            if let pin { draft.pin = .set(pin) }
+        }
+    }
+
+    private var ratingBinding: Binding<ContentRating> {
+        Binding(get: { draft.maxRating }, set: { draft.maxRating = $0 })
+    }
+
+    #if !os(tvOS)
+    /// Kids profile and its highest rating; then the PIN (iPhone, iPad, Mac).
+    @ViewBuilder
+    private var kidsAndPINSections: some View {
+        Section {
+            Toggle(isOn: $draft.isKid) {
+                Text(verbatim: profilesLocalized("Profiles.Kid"))
+            }
+            .accessibilityIdentifier("Profiles.Editor.Kid")
+            if draft.isKid {
+                Picker(selection: ratingBinding) {
+                    ForEach(ContentRating.allCases, id: \.self) { rating in
+                        Text(verbatim: ProfileRatingText.name(rating)).tag(rating)
+                    }
+                } label: {
+                    Text(verbatim: profilesLocalized("Profiles.MaxRating"))
+                }
+                .accessibilityIdentifier("Profiles.Editor.MaxRating")
+            }
+        } footer: {
+            Text(verbatim: profilesLocalized("Profiles.Kid.Footer"))
+        }
+        Section {
+            if draft.hasPIN {
+                Button(profilesLocalized("Profiles.PIN.Change")) { choosingPIN = true }
+                    .accessibilityIdentifier("Profiles.Editor.PIN")
+                Button(profilesLocalized("Profiles.PIN.Remove"), role: .destructive) { draft.pin = .remove }
+                    .accessibilityIdentifier("Profiles.Editor.PIN.Remove")
+            } else {
+                Button(profilesLocalized("Profiles.PIN.Add")) { choosingPIN = true }
+                    .accessibilityIdentifier("Profiles.Editor.PIN")
+            }
+        } header: {
+            Text(verbatim: profilesLocalized("Profiles.PIN"))
+        } footer: {
+            Text(verbatim: profilesLocalized("Profiles.PIN.Footer"))
+        }
+    }
+    #endif
+
     #if os(tvOS)
     /// A 1100 pt card: the title; the 200 pt preview beside the name and the
     /// avatars; Save and Cancel; Delete Profile on a row of its own, or the
@@ -890,6 +1318,16 @@ struct ProfileEditorView: View {
                     .frame(width: 708)
                 }
                 .padding(.top, 36)
+                kidsAndPINRow
+                    .focusSection()
+                    .padding(.top, 32)
+                if draft.isKid {
+                    Text(verbatim: profilesLocalized("Profiles.Kid.Footer"))
+                        .font(.system(size: 22))
+                        .foregroundStyle(GlassSettingsPalette.tertiaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 14)
+                }
                 HStack(spacing: 24) {
                     SwiftUI.Button(profilesLocalized("Profiles.Save"), action: save)
                         .glassActionStyle(prominent: true)
@@ -930,6 +1368,56 @@ struct ProfileEditorView: View {
         // Menu: Cancel, nothing kept.
         .onExitCommand(perform: onClose)
         .presentationBackground(.clear)
+    }
+
+    /// Kids profile (on / off), its highest rating (each press the next
+    /// one), the PIN (add; or change, remove): three buttons on a row, each
+    /// saying its value.
+    private var kidsAndPINRow: some View {
+        HStack(spacing: 24) {
+            SwiftUI.Button { draft.isKid.toggle() } label: {
+                Label {
+                    Text(verbatim: String(format: profilesLocalized("Profiles.ValueFormat"), profilesLocalized("Profiles.Kid"),
+                                         profilesLocalized(draft.isKid ? "Profiles.On" : "Profiles.Off")))
+                } icon: {
+                    Image(systemName: draft.isKid ? "checkmark.circle.fill" : "circle")
+                }
+            }
+            .glassActionStyle()
+            .accessibilityIdentifier("Profiles.Editor.Kid")
+            if draft.isKid {
+                SwiftUI.Button {
+                    let all = ContentRating.allCases
+                    draft.maxRating = all[((all.firstIndex(of: draft.maxRating) ?? 0) + 1) % all.count]
+                } label: {
+                    Text(verbatim: String(format: profilesLocalized("Profiles.ValueFormat"), profilesLocalized("Profiles.MaxRating"),
+                                         ProfileRatingText.short(draft.maxRating)))
+                }
+                .glassActionStyle()
+                .accessibilityValue(Text(verbatim: ProfileRatingText.name(draft.maxRating)))
+                .accessibilityIdentifier("Profiles.Editor.MaxRating")
+            }
+            SwiftUI.Button {
+                if draft.hasPIN { pinActions = true } else { choosingPIN = true }
+            } label: {
+                Label {
+                    Text(verbatim: String(format: profilesLocalized("Profiles.ValueFormat"), profilesLocalized("Profiles.PIN"),
+                                         profilesLocalized(draft.hasPIN ? "Profiles.On" : "Profiles.Off")))
+                } icon: {
+                    Image(systemName: draft.hasPIN ? "lock.fill" : "lock.open")
+                }
+            }
+            .glassActionStyle()
+            .accessibilityIdentifier("Profiles.Editor.PIN")
+            .confirmationDialog(profilesLocalized("Profiles.PIN"), isPresented: $pinActions) {
+                SwiftUI.Button(profilesLocalized("Profiles.PIN.Change")) { choosingPIN = true }
+                SwiftUI.Button(profilesLocalized("Profiles.PIN.Remove"), role: .destructive) { draft.pin = .remove }
+                SwiftUI.Button(profilesLocalized("Profiles.Cancel"), role: .cancel) {}
+            } message: {
+                Text(verbatim: profilesLocalized("Profiles.PIN.Footer"))
+            }
+        }
+        .lineLimit(1)
     }
 
     /// Two rows of six, each circle lit by the focus; the chosen one has the
@@ -1014,6 +1502,7 @@ struct ProfileEditorView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }
+                kidsAndPINSections
             }
             .formStyle(.grouped)
             .fixedSize(horizontal: false, vertical: true)
@@ -1107,6 +1596,7 @@ struct ProfileEditorView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }
+                kidsAndPINSections
                 if isDeletable {
                     Section {
                         Button(profilesLocalized("Profiles.Delete"), role: .destructive) { confirmDelete = true }
@@ -1195,6 +1685,9 @@ struct ProfileGate<Content: View>: View {
 
     @ObservedObject private var question = ProfileLaunchQuestion.shared
     @State private var activeID = ProfileManager.shared.activeID
+    /// The profile in use made a kids profile, or no longer one: every
+    /// screen is made again too (what it may show changed).
+    @State private var restriction = ProfileManager.shared.active.restriction
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -1218,16 +1711,20 @@ struct ProfileGate<Content: View>: View {
                 #endif
             } else {
                 content()
-                    .id(activeID)
+                    .id("\(activeID)|\(restriction?.maxRating.rawValue ?? "all")")
                     .transition(.opacity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .activeProfileDidChange)) { _ in
             activeID = question.profileToShow(shown: activeID, active: ProfileManager.shared.activeID)
+            if !question.isPickerUp { restriction = ProfileManager.shared.active.restriction }
         }
         // A switch made under a picker, applied once it has closed.
         .onChange(of: question.isPickerUp) { _, isUp in
-            if !isUp { activeID = ProfileManager.shared.activeID }
+            if !isUp {
+                activeID = ProfileManager.shared.activeID
+                restriction = ProfileManager.shared.active.restriction
+            }
         }
         // A link while the question is up has no screen to open in: held,
         // and opened by the content once a profile is picked
@@ -1409,6 +1906,8 @@ struct MacProfilesSettingsPane: View {
     /// The main window may still ask « Who's Watching? »: Use answers it.
     @ObservedObject private var question = ProfileLaunchQuestion.shared
     @State private var editing: ProfileDraft?
+    /// A protected profile's Use or ⓘ: its PIN first.
+    @State private var pinRequest: ProfilePINRequest?
     /// A main window shows the player (or another sheet: the quality
     /// picker, the release notes): a switch would close it, so Use waits.
     @State private var isASheetUp = MacNavigator.isASheetUp
@@ -1419,7 +1918,8 @@ struct MacProfilesSettingsPane: View {
                 ForEach(model.profiles) { profile in
                     row(profile)
                 }
-                if model.canAdd {
+                // A kids profile only switches (as in « Who's Watching? »).
+                if model.canAdd && !(model.active?.isKid ?? false) {
                     Button {
                         editing = ProfileDraft(id: nil, name: "", avatar: ProfileAvatar.firstUnused(by: model.profiles))
                     } label: {
@@ -1446,6 +1946,23 @@ struct MacProfilesSettingsPane: View {
         .macSettingsPane()
         .sheet(item: $editing) { draft in
             ProfileEditorView(model: model, draft: draft) { editing = nil }
+        }
+        .background {
+            Color.clear.sheet(item: $pinRequest) { request in
+                ProfilePINView(mode: .verify(request.profile),
+                               check: { model.manager.checkPIN($0, for: request.profile.id) }) { pin in
+                    pinRequest = nil
+                    guard pin != nil else { return }
+                    switch request.purpose {
+                    case .open: use(request.profile)
+                    case .edit:
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            editing = model.profiles.first { $0.id == request.profile.id }.map(ProfileDraft.editing)
+                        }
+                    }
+                }
+                .frame(width: 360, height: 520)
+            }
         }
         // The editor's own sheet counted as one: Use is free again once it
         // has gone.
@@ -1485,23 +2002,24 @@ struct MacProfilesSettingsPane: View {
             Spacer(minLength: 8)
             if !isCurrent {
                 Button(profilesLocalized("Profiles.Use")) {
-                    guard !MacNavigator.isASheetUp else {
-                        isASheetUp = true
-                        NSSound.beep()
-                        return
+                    if profile.hasPIN {
+                        pinRequest = ProfilePINRequest(profile: profile, purpose: .open)
+                    } else {
+                        use(profile)
                     }
-                    ProfileManager.shared.activate(profile.id)
-                    // The windows then show the profile picked, not the
-                    // question behind which it changed.
-                    if question.isAsking { question.answer() }
                 }
                 .controlSize(.small)
                 .disabled(isASheetUp)
                 .help(isASheetUp ? profilesLocalized("Profiles.Use.Busy") : "")
                 .accessibilityIdentifier(profile.id == firstOther ? "Settings.SwitchProfile" : "Settings.UseProfile.\(profile.name)")
             }
+            if !(model.active?.isKid ?? false) {
             Button {
-                editing = .editing(profile)
+                if profile.hasPIN {
+                    pinRequest = ProfilePINRequest(profile: profile, purpose: .edit)
+                } else {
+                    editing = .editing(profile)
+                }
             } label: {
                 Image(systemName: "info.circle")
             }
@@ -1509,7 +2027,20 @@ struct MacProfilesSettingsPane: View {
             .help(profilesLocalized("Profiles.Edit"))
             .accessibilityLabel(Text(verbatim: String(format: profilesLocalized("Profiles.EditNamed"), profile.name)))
             .accessibilityIdentifier("Settings.EditProfile.\(profile.name)")
+            }
         }
+    }
+
+    private func use(_ profile: Profile) {
+        guard !MacNavigator.isASheetUp else {
+            isASheetUp = true
+            NSSound.beep()
+            return
+        }
+        ProfileManager.shared.activate(profile.id)
+        // The windows then show the profile picked, not the
+        // question behind which it changed.
+        if question.isAsking { question.answer() }
     }
 }
 

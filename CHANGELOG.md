@@ -5,6 +5,32 @@ What changed in each version of this fork of PopcornTimeTV, newest first. The in
 (`PopcornTime/UI/Shared SwiftUI/WhatsNew.swift`). The technical reference (formats, Top Shelf,
 logs, tests) is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
+## Unreleased
+
+**Kids profiles and profile PINs (Apple TV, iPhone / iPad, Mac)**
+- A profile can be a **Kids profile**, with a maximum rating: All Ages (G, TV-Y, TV-G), up to
+  PG (TV-Y7, TV-PG) or up to PG-13 (TV-14). It sees only the titles rated up to it on the Home
+  (every shelf, the hero, Continue Watching, the watchlist), in Movies and Shows (the services'
+  catalogues too), in Search and in « More Like This ». A title without a rating is hidden.
+  Ratings are read in the US, UK, French, German, Canadian, Brazilian and Australian systems
+  and as plain ages (« 12 », « 16+ »).
+- Where the ratings come from: the title's source when it gives one (YTS, the Popcorn API), else
+  TMDB with the user's TMDB key (`/find`, then the film's release dates or the show's content
+  ratings: the US rating first, else the device's country's). They are kept in the Caches folder
+  for every profile; a title TMDB has no rating for is asked again after 14 days. Without a TMDB
+  key few titles are rated, and a Kids profile shows few titles (its editor says so). A list
+  waits 4 s at most for the ratings it lacks; the Home is made again as they come.
+- A profile can have a **4-digit PIN**: « Who's Watching? » asks it before opening the profile,
+  and Manage Profiles before editing or deleting it (the Mac's Settings › Profiles too, for Use
+  and ⓘ). The PIN pad is buttons, so the Apple TV's remote works it; the Mac also takes the
+  keyboard. Only a salted PBKDF2-SHA256 hash of the PIN is stored, in the profiles' list. A
+  padlock marks a protected profile. In a Kids profile, the picker offers no Manage Profiles
+  nor Add Profile.
+- Profiles saved by 5.5.0 and earlier are read as profiles for everyone, without a PIN: nothing
+  to migrate. DEBUG: `-PTDebugProfilePINs "Alex:1234"` and `-PTDebugKidProfiles "Sam"`.
+- Not done: the legacy UIKit title pages' related titles (Trakt, unused by the glass pages) are
+  not filtered, and a title opened from a link is not blocked.
+
 ## 5.5.0
 
 Its short form is shown once in the app after the update (`WhatsNewRelease.v5_5_0`).

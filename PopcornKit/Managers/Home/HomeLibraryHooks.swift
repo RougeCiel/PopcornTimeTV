@@ -198,7 +198,11 @@ public extension HomeFeed {
         let profile = center.addObserver(forName: .activeProfileDidChange, object: nil, queue: .main) { [weak self] _ in
             self?.refreshLocal()
         }
-        return [library, profile, taste]
+        // A kids profile sees the titles rated for it: the page is made
+        // again as the ratings of its titles come.
+        contentRestriction = { ContentRestriction.current }
+        let ratings = recompute(on: ContentRatingStore.didChangeNotification, of: nil, burst: Burst(), center: center)
+        return [library, profile, taste, ratings]
     }
 
     /// Recomputes the local shelves whenever `library` changes — a title

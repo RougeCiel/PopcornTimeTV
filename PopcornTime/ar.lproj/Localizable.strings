@@ -971,6 +971,29 @@
 "Profiles.Use.Busy" = "يتوفر بعد إغلاق النافذة المفتوحة.";
 /* The profile editor: the profile was deleted meanwhile (another window). */
 "Profiles.Error.Gone" = "لم يعد هذا الملف الشخصي موجودًا.";
+"Profiles.Kid" = "ملف شخصي للأطفال";
+"Profiles.Kid.Footer" = "تُعرض فقط العناوين المصنّفة حتى التصنيف الأقصى: في الصفحة الرئيسية وفي الأفلام والمسلسلات وفي البحث وفي العناوين المشابهة. يُخفى العنوان غير المصنّف. تأتي التصنيفات من المصادر ومن TMDB بمفتاحك؛ من دون مفتاح، تُصنَّف عناوين قليلة. لا تتوفر إدارة الملفات الشخصية في ملف الأطفال.";
+"Profiles.MaxRating" = "التصنيف الأقصى";
+"Profiles.MaxRating.G" = "لجميع الأعمار (G وTV-Y وTV-G)";
+"Profiles.MaxRating.G.Short" = "لجميع الأعمار";
+"Profiles.MaxRating.PG" = "حتى PG (TV-Y7 وTV-PG)";
+"Profiles.MaxRating.PG13" = "حتى PG-13 (TV-14)";
+"Profiles.On" = "نعم";
+"Profiles.Off" = "لا";
+"Profiles.PIN" = "رمز PIN للملف";
+"Profiles.PIN.Add" = "إضافة رمز PIN…";
+"Profiles.PIN.Change" = "تغيير رمز PIN…";
+"Profiles.PIN.Remove" = "إزالة رمز PIN";
+"Profiles.PIN.Footer" = "يُطلب رمز PIN من 4 أرقام قبل فتح هذا الملف الشخصي أو تعديله أو حذفه.";
+"Profiles.PIN.Enter" = "أدخل رمز PIN الخاص بـ %@";
+"Profiles.PIN.New" = "اختر رمز PIN من 4 أرقام";
+"Profiles.PIN.Confirm" = "أدخل رمز PIN مرة أخرى";
+"Profiles.PIN.Wrong" = "رمز PIN غير صحيح. حاول مرة أخرى.";
+"Profiles.PIN.Mismatch" = "رمزا PIN غير متطابقين. حاول مرة أخرى.";
+"Profiles.PIN.DeleteDigit" = "حذف";
+"Profiles.PIN.LockedValue" = "مقفل";
+"Profiles.ValueFormat" = "%1$@: %2$@";
+"Profiles.Error.InvalidPIN" = "يتكون رمز PIN من 4 أرقام.";
 /* 5.4.0 review-fixes-2 */
 /* Settings › Audio / Subtitle Language: the choice that follows the language the profile picks itself (the key never set). */
 "Settings.Language.Automatic" = "تلقائي";

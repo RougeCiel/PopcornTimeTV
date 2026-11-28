@@ -968,6 +968,29 @@
 "Profiles.Use.Busy" = "Disponibile dopo la chiusura della finestra aperta.";
 /* The profile editor: the profile was deleted meanwhile (another window). */
 "Profiles.Error.Gone" = "Questo profilo non esiste più.";
+"Profiles.Kid" = "Profilo bambini";
+"Profiles.Kid.Footer" = "Vengono mostrati solo i titoli classificati fino alla classificazione massima: nella Home, in Film e Serie, in Cerca e in Titoli simili. Un titolo senza classificazione viene nascosto. Le classificazioni provengono dalle fonti e da TMDB con la tua chiave TMDB; senza chiave, pochi titoli sono classificati. Gestisci profili non è disponibile in un profilo bambini.";
+"Profiles.MaxRating" = "Classificazione massima";
+"Profiles.MaxRating.G" = "Per tutti (G, TV-Y, TV-G)";
+"Profiles.MaxRating.G.Short" = "Per tutti";
+"Profiles.MaxRating.PG" = "Fino a PG (TV-Y7, TV-PG)";
+"Profiles.MaxRating.PG13" = "Fino a PG-13 (TV-14)";
+"Profiles.On" = "Sì";
+"Profiles.Off" = "No";
+"Profiles.PIN" = "PIN del profilo";
+"Profiles.PIN.Add" = "Aggiungi PIN…";
+"Profiles.PIN.Change" = "Cambia PIN…";
+"Profiles.PIN.Remove" = "Rimuovi PIN";
+"Profiles.PIN.Footer" = "Viene chiesto un PIN di 4 cifre prima di aprire, modificare o eliminare questo profilo.";
+"Profiles.PIN.Enter" = "Inserisci il PIN di %@";
+"Profiles.PIN.New" = "Scegli un PIN di 4 cifre";
+"Profiles.PIN.Confirm" = "Inserisci di nuovo il PIN";
+"Profiles.PIN.Wrong" = "PIN errato. Riprova.";
+"Profiles.PIN.Mismatch" = "I PIN non corrispondono. Riprova.";
+"Profiles.PIN.DeleteDigit" = "Cancella";
+"Profiles.PIN.LockedValue" = "Bloccato";
+"Profiles.ValueFormat" = "%1$@: %2$@";
+"Profiles.Error.InvalidPIN" = "Un PIN ha 4 cifre.";
 /* 5.4.0 review-fixes-2 */
 /* Settings › Audio / Subtitle Language: the choice that follows the language the profile picks itself (the key never set). */
 "Settings.Language.Automatic" = "Automatico";

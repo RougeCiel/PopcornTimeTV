@@ -77,6 +77,10 @@ public struct CatalogPager<Item> {
     /// The source filters its pages (a genre): an empty page is then one
     /// without a match, not the end of the catalogue.
     private var isFiltered = false
+    /// A kids profile's grid (`ContentRestriction`): a page may come back
+    /// empty with every title of it rated above the profile, and pages with
+    /// titles after it — not the end of the catalogue.
+    public var isRestricted = false
 
     public init(toleratedBarrenPages: Int = 3, id: @escaping (Item) -> String) {
         self.toleratedBarrenPages = max(1, toleratedBarrenPages)
@@ -202,7 +206,7 @@ public struct CatalogPager<Item> {
         }
 
         let fresh = page.filter { ids.insert(id($0)).inserted }
-        if page.isEmpty && !isFiltered {
+        if page.isEmpty && !isFiltered && !isRestricted {
             hasMore = false
             return .applied
         }

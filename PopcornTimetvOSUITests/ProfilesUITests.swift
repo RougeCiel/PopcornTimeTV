@@ -373,6 +373,82 @@ final class ProfilesUITests: XCTestCase {
         XCTAssertTrue(element("Profiles.Title").waitForNonExistence(timeout: 10), "the picker stayed")
     }
 
+    /// A profile with a PIN: its circle has a padlock; pressing it
+    /// asks the PIN on a keypad the remote moves over; a wrong one says so
+    /// and empties the dots; Menu goes back to the picker; the right one
+    /// opens its Home.
+    func testAProtectedProfileAsksItsPIN() throws {
+        launch(["-PTDebugProfiles", "Alex", "-PTDebugProfilePINs", "Alex:2580"])
+        XCTAssertTrue(element("Profiles.Title").waitForExistence(timeout: 20), "« Who's Watching? » never showed")
+        pause(1.5)
+        XCTAssertEqual(element("Profiles.Profile.Alex").value as? String, "Locked", "Alex is not told locked")
+        remote.press(.right)
+        pause(0.8)
+        XCTAssertEqual(focusedIdentifier, "Profiles.Profile.Alex", "the focus is not on Alex")
+        remote.press(.select)
+        XCTAssertTrue(element("Profiles.PIN.Title").waitForExistence(timeout: 10), "no PIN asked")
+        pause(1)
+        snap("pin-1-asked")
+        XCTAssertEqual(focusedIdentifier, "Profiles.PIN.Key.5", "the keypad's focus does not start in its middle")
+
+        // Menu: back to the picker, nothing opened.
+        remote.press(.menu)
+        XCTAssertTrue(element("Profiles.PIN.Title").waitForNonExistence(timeout: 5), "Menu does not close the PIN")
+        XCTAssertTrue(element("Profiles.Title").exists, "the picker is gone")
+        pause(1)
+        remote.press(.select)
+        XCTAssertTrue(element("Profiles.PIN.Title").waitForExistence(timeout: 10), "no PIN asked again")
+        pause(1)
+
+        typePIN("1111")
+        let wrong = element("Profiles.PIN.Message")
+        XCTAssertTrue(wrong.waitForExistence(timeout: 5), "no message")
+        pause(0.5)
+        XCTAssertEqual(wrong.label, "Wrong PIN. Try again.", "a wrong PIN is not told")
+        snap("pin-2-wrong")
+        XCTAssertTrue(element("Profiles.Title").exists, "a wrong PIN opened the profile")
+
+        typePIN("2580")
+        XCTAssertTrue(element("Profiles.PIN.Title").waitForNonExistence(timeout: 10), "the right PIN does not open Alex")
+        XCTAssertTrue(element("Home.Hero").waitForExistence(timeout: 30), "Alex's Home never showed")
+        snap("pin-3-home")
+    }
+
+    /// Types `pin` on the keypad with the remote, from the key in focus.
+    private func typePIN(_ pin: String) {
+        func place(_ digit: Int) -> (row: Int, column: Int) {
+            digit == 0 ? (3, 1) : ((digit - 1) / 3, (digit - 1) % 3)
+        }
+        for character in pin {
+            let digit = Int(String(character))!
+            let target = place(digit)
+            for _ in 0..<6 where focusedIdentifier != "Profiles.PIN.Key.\(digit)" {
+                let focused = focusedIdentifier
+                guard focused.hasPrefix("Profiles.PIN.Key."), let current = Int(focused.dropFirst("Profiles.PIN.Key.".count)) else {
+                    remote.press(.up)
+                    pause(0.6)
+                    continue
+                }
+                // The last row is Cancel, 0, Delete: reached from above 0,
+                // left by going up.
+                let here = place(current)
+                if here.row == 3 && target.row != 3 {
+                    remote.press(.up)
+                } else if target.row == 3 && here.column != target.column {
+                    remote.press(here.column < target.column ? .right : .left)
+                } else if here.row != target.row {
+                    remote.press(here.row < target.row ? .down : .up)
+                } else {
+                    remote.press(here.column < target.column ? .right : .left)
+                }
+                pause(0.6)
+            }
+            XCTAssertEqual(focusedIdentifier, "Profiles.PIN.Key.\(digit)", "the key \(digit) never got the focus")
+            remote.press(.select)
+            pause(0.6)
+        }
+    }
+
     private func waitUntilLeft(timeout: TimeInterval = 8) -> Bool {
         if app.wait(for: .runningBackground, timeout: timeout) { return true }
         return [.runningBackgroundSuspended, .notRunning].contains(app.state)

@@ -269,11 +269,25 @@ class MediaViewController: MainViewController {
         // the grid would keep its last titles back for a row that never
         // fills: `CollectionViewController.shownCount`).
         barrenPages = added.isEmpty ? barrenPages + 1 : 0
-        if items.isEmpty || barrenPages >= MediaViewController.toleratedBarrenPages || (currentService != nil && serviceListIsOver) {
+        // A kids profile's page may be empty with titles after it (every
+        // title of it rated above the profile): a barren page, not the end.
+        let isEnd = items.isEmpty && ContentRestriction.current == nil
+        if isEnd || barrenPages >= MediaViewController.toleratedBarrenPages || (currentService != nil && serviceListIsOver) {
             // No more results: the content inset of the collection view is reset.
             collectionView?.contentInset.bottom = tabBarController?.tabBar.frame.height ?? 0
         } else {
             controller.hasNextPage = true
+            // A kids profile's page may keep few titles: while the grid has
+            // less than a few rows, the next page at once — no poster may
+            // ever take the focus to ask for it.
+            if ContentRestriction.current != nil, listed.count + added.count < 40 {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, let grid = self.collectionViewController,
+                          grid.hasNextPage, !grid.isLoading, grid.loadMoreError == nil else { return }
+                    grid.currentPage += 1
+                    self.load(page: grid.currentPage)
+                }
+            }
         }
         guard let merge = merge else {
             if controller.dataSources.isEmpty { controller.dataSources = [[]] }

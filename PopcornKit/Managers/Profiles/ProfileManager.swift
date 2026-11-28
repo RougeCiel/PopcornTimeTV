@@ -10,6 +10,9 @@ import Foundation
 //   - the preferred audio and subtitle languages and the recent searches
 //     (iPhone, iPad; `ProfileManager.scopedKey`);
 //   - the taste (`ProfileTaste`: « For You », the languages it learns);
+//   - whether it is a kids profile and its highest rating
+//     (`ContentRestriction`), and its PIN, as a hash (`ProfilePIN`), both in
+//     the profiles' list;
 //   - the Trakt account (`ProfileManager.traktCredentialIdentifier`): its
 //     lists are synced into the profile that asked for them
 //     (`answerForActiveProfile`), and again when another profile becomes
@@ -42,15 +45,54 @@ public struct Profile: Codable, Equatable, Identifiable, Hashable {
     /// An index in the app's avatar list (`ProfileAvatar` in the apps).
     public var avatar: Int
     public let createdAt: Date
+    /// A kids profile: it sees only the titles rated up to
+    /// `maxRating` (`ContentRestriction`).
+    public var isKid: Bool
+    /// The highest rating a kids profile sees; kept when the profile is no
+    /// longer a kids one, for the day it is again.
+    public var maxRating: ContentRating
+    /// The PIN's hash (`ProfilePIN`), never the PIN: nil without a PIN.
+    public var pinHash: String?
 
-    public init(id: String, name: String, avatar: Int, createdAt: Date) {
+    public init(id: String, name: String, avatar: Int, createdAt: Date, isKid: Bool = false,
+                maxRating: ContentRating = .default, pinHash: String? = nil) {
         self.id = id
         self.name = name
         self.avatar = avatar
         self.createdAt = createdAt
+        self.isKid = isKid
+        self.maxRating = maxRating
+        self.pinHash = pinHash
     }
 
     public var isPrimary: Bool { return id == Profile.primaryID }
+
+    /// « Who's Watching? » asks its PIN before opening it, editing or
+    /// deleting it.
+    public var hasPIN: Bool { return pinHash != nil }
+
+    /// What the profile may see: nil when it is not a kids profile.
+    public var restriction: ContentRestriction? {
+        return isKid ? ContentRestriction(maxRating: maxRating) : nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, avatar, createdAt, isKid, maxRating, pinHash
+    }
+
+    /// A profile saved by 5.5.0 and earlier has none of the kids keys nor a PIN:
+    /// it is read as a profile for everyone, without a PIN. A rating
+    /// written by a later build and not known here reads as the default.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        avatar = try container.decode(Int.self, forKey: .avatar)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        isKid = try container.decodeIfPresent(Bool.self, forKey: .isKid) ?? false
+        maxRating = (try? container.decodeIfPresent(ContentRating.self, forKey: .maxRating)) ?? .default
+        pinHash = try container.decodeIfPresent(String.self, forKey: .pinHash)
+    }
 }
 
 /// Where the profiles' data lives: the standard defaults in the apps, a
@@ -137,6 +179,8 @@ public final class ProfileManager {
         /// The primary profile cannot be deleted.
         case cannotDeletePrimary
         case unknownProfile
+        /// A PIN is four digits.
+        case invalidPIN
     }
 
     /// Profiles a device can have (Netflix's number).
@@ -160,6 +204,19 @@ public final class ProfileManager {
             let names = (defaults.string(forKey: "PTDebugProfiles") ?? "").split(separator: ",")
             for (index, name) in names.enumerated() {
                 _ = try? manager.create(name: String(name).trimmingCharacters(in: .whitespaces), avatar: index + 1)
+            }
+            // `-PTDebugProfilePINs "Alex:1234"`: those profiles have a PIN;
+            // `-PTDebugKidProfiles "Sam"`: those are kids profiles (PG).
+            for pair in (defaults.string(forKey: "PTDebugProfilePINs") ?? "").split(separator: ",") {
+                let parts = pair.split(separator: ":").map(String.init)
+                if parts.count == 2, let profile = manager.profiles.first(where: { $0.name == parts[0] }) {
+                    try? manager.setPIN(parts[1], for: profile.id)
+                }
+            }
+            for name in (defaults.string(forKey: "PTDebugKidProfiles") ?? "").split(separator: ",") {
+                if let profile = manager.profiles.first(where: { $0.name == String(name) }) {
+                    try? manager.update(profile.id, isKid: true)
+                }
             }
             return manager
         }
@@ -339,7 +396,7 @@ public final class ProfileManager {
 
     /// Adds a profile (not made active).
     @discardableResult
-    public func create(name: String, avatar: Int) throws -> Profile {
+    public func create(name: String, avatar: Int, isKid: Bool = false, maxRating: ContentRating = .default) throws -> Profile {
         lock.lock()
         let clean: String
         do {
@@ -351,7 +408,7 @@ public final class ProfileManager {
         }
         var id = makeID()
         while list.contains(where: { $0.id == id }) || id == Profile.primaryID { id = makeID() }
-        let profile = Profile(id: id, name: clean, avatar: avatar, createdAt: now())
+        let profile = Profile(id: id, name: clean, avatar: avatar, createdAt: now(), isKid: isKid, maxRating: maxRating)
         list.append(profile)
         save()
         lock.unlock()
@@ -359,13 +416,22 @@ public final class ProfileManager {
         return profile
     }
 
-    /// Renames a profile and/or gives it another avatar.
-    public func update(_ id: String, name: String? = nil, avatar: Int? = nil) throws {
+    /// Renames a profile, gives it another avatar, makes it a kids profile
+    /// or not, and/or changes its highest rating. Making the active
+    /// profile a kids one, or the other way, changes what every screen
+    /// shows: `activeProfileDidChange` is posted, and the apps rebuild.
+    public func update(_ id: String, name: String? = nil, avatar: Int? = nil,
+                       isKid: Bool? = nil, maxRating: ContentRating? = nil) throws {
         lock.lock()
+        let restrictionChanged: Bool
         do {
             guard let index = list.firstIndex(where: { $0.id == id }) else { throw ProfileError.unknownProfile }
+            let before = list[index].restriction
             if let name = name { list[index].name = try validated(name, excluding: id) }
             if let avatar = avatar { list[index].avatar = avatar }
+            if let isKid = isKid { list[index].isKid = isKid }
+            if let maxRating = maxRating { list[index].maxRating = maxRating }
+            restrictionChanged = id == activeProfileID && before != list[index].restriction
         } catch {
             lock.unlock()
             throw error
@@ -373,6 +439,26 @@ public final class ProfileManager {
         save()
         lock.unlock()
         post(.profilesDidChange)
+        if restrictionChanged { post(.activeProfileDidChange) }
+    }
+
+    /// Gives a profile a PIN (four digits), or takes it away (nil). Only
+    /// its hash is stored (`ProfilePIN`).
+    public func setPIN(_ pin: String?, for id: String) throws {
+        if let pin, !ProfilePIN.isValid(pin) { throw ProfileError.invalidPIN }
+        lock.lock()
+        guard let index = list.firstIndex(where: { $0.id == id }) else { lock.unlock(); throw ProfileError.unknownProfile }
+        list[index].pinHash = pin.map { ProfilePIN.hash($0, profileID: id) }
+        save()
+        lock.unlock()
+        post(.profilesDidChange)
+    }
+
+    /// Whether `pin` opens the profile: true for a profile without a PIN.
+    public func checkPIN(_ pin: String, for id: String) -> Bool {
+        guard let profile = profile(withID: id) else { return false }
+        guard let hash = profile.pinHash else { return true }
+        return ProfilePIN.matches(pin, hash: hash, profileID: id)
     }
 
     /// Deletes a profile and every piece of its data. Deleting the active
