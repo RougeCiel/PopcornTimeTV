@@ -45,6 +45,11 @@ resume question then says so; VLC jumps by the keyframe index, under « Resuming
 `[Resume]` lines name it: `native jumps are off (PTNativeJumpsDisabled)`. To try it, add
 `-PTNativeJumpsDisabled YES` to the scheme's launch arguments.
 
+The same kind of switch, `PTTrickPlayDisabled` (`YES`), removes the I-frame stream of the remux
+(`RemuxIFrames.swift`: the preview thumbnails shown while scrubbing): the master playlist then
+announces no `#EXT-X-I-FRAME-STREAM-INF`, as before. The `[Remux] master.m3u8 served` line says
+which (`I-frames … kb/s` or `no I-frame stream`).
+
 ## Building
 
 Requires Xcode 26 or later and [CocoaPods](https://cocoapods.org); PopcornTorrent (the torrent

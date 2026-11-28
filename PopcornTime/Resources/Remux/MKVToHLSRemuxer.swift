@@ -942,6 +942,20 @@ final class MKVToHLSRemuxSession {
                                   type: .event(ended: state.finished))
     }
 
+    /// The video rendition's I-frame playlist (trick play, `RemuxIFrames`):
+    /// the frozen VOD list as `iframe{K}.m4s` entries, `#EXT-X-I-FRAMES-ONLY`
+    /// — freezing the list when it is the first playlist served, as any
+    /// media playlist does. nil before the session is ready and for an EVENT
+    /// session (no Duration: the master announces no I-frame stream then).
+    func iFramePlaylist() -> String? {
+        let (ready, duration, target) = lock.withLock { (lockedVideo != nil, lockedDuration, lockedTarget) }
+        guard ready, duration > 0 else { return nil }
+        return HLSPlaylists.media(mapURI: "video_init.mp4", segmentPrefix: RemuxIFrames.segmentPrefix,
+                                  segmentExtension: RemuxIFrames.segmentExtension,
+                                  actualDurations: vodPlaylistDurations(), expectedSegments: 0,
+                                  targetDuration: target, iFramesOnly: true)
+    }
+
     /// The EXTINF list of the VOD media playlists (see `mediaPlaylist`):
     /// the frozen one; else built now — the real durations so far, then the
     /// planned durations of the rest when a keyframe-index plan is active

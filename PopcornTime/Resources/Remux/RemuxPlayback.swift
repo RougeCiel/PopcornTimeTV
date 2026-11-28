@@ -1088,6 +1088,14 @@ final class RemuxPlayback {
     /// BANDWIDTH of the first master playlist served: later ones repeat it
     /// (the estimate follows the size of a growing file).
     private var lockedMasterBandwidth: Int?
+    /// The I-frame stream of the first master playlist served (nil inside:
+    /// none announced — EVENT session, `PTTrickPlayDisabled`): later masters
+    /// repeat it.
+    private var lockedMasterIFrames: HLSPlaylists.IFrameStream??
+    /// The video track's timescale (video_init.mp4), read once.
+    private var lockedVideoTimescale: UInt32?
+    /// I-frame segments served so far.
+    private var lockedIFramesServed = 0
     /// The last reported `wanted` position lay past the remuxed range
     /// (logged once per such episode).
     private var lockedWantedPastRemux = false
@@ -1461,6 +1469,26 @@ final class RemuxPlayback {
             let name = String(request.path.dropFirst())
             guard let text = self.mediaPlaylist(named: name) else { return GCDWebServerResponse(statusCode: 404) }
             return GCDWebServerDataResponse(data: Data(text.utf8), contentType: Self.playlistType)
+        }
+        // Trick play (`RemuxIFrames`): the I-frame playlist, and I-frame
+        // segments answered at once from the segments on disk — their own
+        // handler: never held, never 404, never a lookahead anchor.
+        server.addHandler(forMethod: "GET", path: "/" + RemuxIFrames.playlistName, request: GCDWebServerRequest.self) { [weak self] _ in
+            guard let self = self else { return GCDWebServerResponse(statusCode: 410) }
+            guard let text = self.session?.iFramePlaylist() else { return GCDWebServerResponse(statusCode: 404) }
+            return GCDWebServerDataResponse(data: Data(text.utf8), contentType: Self.playlistType)
+        }
+        server.addHandler(forMethod: "GET", pathRegex: "^/iframe[0-9]+\\.m4s$", request: GCDWebServerRequest.self) { [weak self] request in
+            guard let self = self, !self.isStopped else { return GCDWebServerResponse(statusCode: 410) }
+            guard let index = RemuxIFrames.segmentIndex(String(request.path.dropFirst())),
+                  let data = self.iFrameSegment(index: index) else {
+                // Nothing on disk to make it from yet (the session isn't
+                // ready): 503, never 404 (« gone for good » for the players).
+                let response = GCDWebServerResponse(statusCode: 503)
+                response.setValue("1", forAdditionalHeader: "Retry-After")
+                return response
+            }
+            return GCDWebServerDataResponse(data: data, contentType: "video/mp4")
         }
         // External (OpenSubtitles) subtitle playlists + payloads: never 404
         // for a key a served master listed (see the class comment).
@@ -1905,8 +1933,17 @@ final class RemuxPlayback {
             lockedMasterBandwidth = first
             return first
         }
+        let iFrames: HLSPlaylists.IFrameStream? = {
+            if let first = stateLock.withLock({ lockedMasterIFrames }) { return first }
+            let made = masterIFrameStream(session: session, videoBandwidth: bandwidth)
+            return stateLock.withLock {
+                let first = lockedMasterIFrames ?? made
+                lockedMasterIFrames = first
+                return first
+            }
+        }()
         let text = HLSPlaylists.master(video: video, audio: audio, subtitles: embedded, external: external,
-                                       bandwidth: bandwidth, averageBandwidth: bandwidth * 2 / 3)
+                                       bandwidth: bandwidth, averageBandwidth: bandwidth * 2 / 3, iFrames: iFrames)
         let advertised = external.map { Self.externalKey(fromPath: "/" + $0.uri, suffix: ".m3u8") }
         let firstServe: Bool = stateLock.withLock {
             lockedAdvertisedExternalKeys.formUnion(advertised)
@@ -1915,9 +1952,77 @@ final class RemuxPlayback {
         }
         if firstServe {
             let channels = audio.map { "\($0.codecs)/\($0.channels)" }.joined(separator: ", ")
-            print("[Remux] master.m3u8 served — \(video.codecs)\(video.supplementalCodecs.map { " + " + $0 } ?? "") \(video.videoRange) · audio [\(channels)] · \(embedded.count) sous-titres intégrés + \(external.count) OpenSubtitles")
+            print("[Remux] master.m3u8 served — \(video.codecs)\(video.supplementalCodecs.map { " + " + $0 } ?? "") \(video.videoRange) · audio [\(channels)] · \(embedded.count) sous-titres intégrés + \(external.count) OpenSubtitles"
+                  + (iFrames.map { " · I-frames \($0.bandwidth / 1000) kb/s" } ?? " · no I-frame stream"))
         }
         return text
+    }
+
+    // MARK: - Trick play (I-frames, see RemuxIFrames)
+
+    /// The I-frame stream a master announces: VOD sessions only (an EVENT
+    /// list grows, an I-frame playlist fetched once could not follow), not
+    /// with `PTTrickPlayDisabled`. Its BANDWIDTH comes from the keyframe that
+    /// opens segment 0 (written before any master is served), else a tenth
+    /// of the video's.
+    private func masterIFrameStream(session: MKVToHLSRemuxSession, videoBandwidth: Int) -> HLSPlaylists.IFrameStream? {
+        guard !RemuxIFrames.isDisabled, session.totalDurationSeconds > 0 else { return nil }
+        var bandwidth: Int?
+        if let first = session.segmentDurations().first,
+           let read = RemuxIFrames.readKeyframe(segmentAt: outputDir.appendingPathComponent("vseg0.m4s")) {
+            bandwidth = RemuxIFrames.bandwidth(keyframeBytes: read.sample.count, secondsPerKeyframe: first)
+        }
+        return HLSPlaylists.IFrameStream(bandwidth: bandwidth ?? max(1, videoBandwidth / 10), uri: RemuxIFrames.playlistName)
+    }
+
+    /// `iframe{index}.m4s`: the keyframe opening `vseg{index}.m4s`, alone in
+    /// one fragment — or, when that segment is not on disk (not remuxed yet,
+    /// a hole, pruned), the nearest one that is, moved to `index`'s start
+    /// (`RemuxIFrames.sourceOrder`). Reads only the output directory: no
+    /// torrent read, no hold, no lookahead anchor. nil when nothing can be
+    /// made (no session, an index past the frozen list's end is served from
+    /// its last segment). Any thread. (Internal: the tests ask without a server.)
+    func iFrameSegment(index: Int) -> Data? {
+        guard let session = session, let list = session.playerTimelineDurations(), !list.isEmpty, index >= 0 else {
+            return nil
+        }
+        guard let timescale = videoTimescale() else { return nil }
+        let written = session.progress.segmentsWritten
+        let missing = session.missingSegments()
+        let requested = min(index, list.count - 1)
+        func start(_ k: Int) -> Double { list.prefix(k).reduce(0, +) }
+        for k in RemuxIFrames.sourceOrder(requested: requested, count: min(list.count, max(written, 1))) {
+            guard k < written, !missing.contains(k), !isPruned(k) else { continue }
+            // Opened under `fileLock` (deletions take it); once open, a
+            // deletion no longer matters.
+            let url = outputDir.appendingPathComponent("vseg\(k).m4s")
+            guard let read = fileLock.withLock({ RemuxIFrames.readKeyframe(segmentAt: url) }) else { continue }
+            let decodeTime = k == requested ? read.keyframe.baseDecodeTime
+                : RemuxIFrames.movedDecodeTime(read.keyframe.baseDecodeTime, sourceStart: start(k),
+                                                targetStart: start(requested), timescale: timescale)
+            let data = RemuxIFrames.fragment(keyframe: read.keyframe, sample: read.sample,
+                                             sequence: UInt32(clamping: index + 1), baseDecodeTime: decodeTime)
+            let first: Bool = stateLock.withLock {
+                lockedIFramesServed += 1
+                return lockedIFramesServed == 1
+            }
+            if first {
+                print("[Remux] trick play: first I-frame served — iframe\(index) from vseg\(k) (\(read.sample.count / 1024) KB)")
+            }
+            return data
+        }
+        return nil
+    }
+
+    /// I-frame segments served so far (stats, tests). Thread-safe.
+    var iFramesServed: Int { stateLock.withLock { lockedIFramesServed } }
+
+    private func videoTimescale() -> UInt32? {
+        if let known = stateLock.withLock({ lockedVideoTimescale }) { return known }
+        guard let data = try? Data(contentsOf: outputDir.appendingPathComponent("video_init.mp4")),
+              let timescale = RemuxIFrames.timescale(ofInitSegment: data) else { return nil }
+        stateLock.withLock { lockedVideoTimescale = timescale }
+        return timescale
     }
 
     /// VOD spanning the whole movie (EXTINF adding up to the header's

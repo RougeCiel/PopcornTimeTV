@@ -5,6 +5,20 @@ What changed in each version of this fork of PopcornTimeTV, newest first. The in
 (`PopcornTime/UI/Shared SwiftUI/WhatsNew.swift`). The technical reference (formats, Top Shelf,
 logs, tests) is in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
+## Unreleased
+
+**Preview thumbnails while scrubbing (Apple TV, iPhone / iPad, Mac)**
+- MKV files (the remux route) now have an HLS I-frame stream: the Apple TV transport bar shows
+  a picture of the film while you scrub, fast-forward or rewind, as streaming apps do. Each
+  thumbnail is the keyframe that opens a segment (one every ~6 s), copied from the converted
+  video, so Dolby Vision, HDR10+, HDR10 and HLG keep their own codecs and range
+  (`#EXT-X-I-FRAME-STREAM-INF` with the video's CODECS, SUPPLEMENTAL-CODECS and VIDEO-RANGE).
+- The thumbnails never read the torrent nor move the conversion: a part of the film that is not
+  converted yet (not downloaded, skipped by a jump, deleted to save space) shows the nearest
+  picture that is, so playback and the start are unchanged. Files without a known length
+  (EVENT playlists), MP4 files played directly and VLC have no thumbnails. The user default
+  `PTTrickPlayDisabled` (`YES`) turns them off.
+
 ## 5.5.0
 
 Its short form is shown once in the app after the update (`WhatsNewRelease.v5_5_0`).

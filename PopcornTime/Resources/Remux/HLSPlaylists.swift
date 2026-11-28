@@ -68,7 +68,8 @@ enum HLSPlaylists {
                        external: [ExternalSubtitle],
                        bandwidth: Int,
                        averageBandwidth: Int? = nil,
-                       closedCaptionsNone: Bool = true) -> String {
+                       closedCaptionsNone: Bool = true,
+                       iFrames: IFrameStream? = nil) -> String {
         var lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"]
 
         // AUDIO group --------------------------------------------------------
@@ -165,7 +166,35 @@ enum HLSPlaylists {
         if closedCaptionsNone { attributes.append("CLOSED-CAPTIONS=NONE") }
         lines.append("#EXT-X-STREAM-INF:" + attributes.joined(separator: ","))
         lines.append(video.playlistName)
+        if let iFrames = iFrames { lines.append(iFrameStreamInf(video: video, stream: iFrames)) }
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// The I-frame rendition announced next to the video variant (trick play
+    /// thumbnails, `RemuxIFrames`).
+    struct IFrameStream: Equatable {
+        /// Peak bits per second of the I-frames.
+        let bandwidth: Int
+        let uri: String
+    }
+
+    /// `#EXT-X-I-FRAME-STREAM-INF` for `video`'s I-frames: the same samples
+    /// as the video rendition, so the video's own CODECS (no audio: an
+    /// I-frame stream has none), SUPPLEMENTAL-CODECS (Dolby Vision's
+    /// `dvh1…/db1p` / `db4h` pairings), RESOLUTION and VIDEO-RANGE — an HDR
+    /// I-frame stream announced SDR would be refused or tone-mapped wrongly.
+    static func iFrameStreamInf(video: MKVToHLSRemuxSession.VideoRendition, stream: IFrameStream) -> String {
+        var attributes = ["BANDWIDTH=\(max(1, stream.bandwidth))"]
+        attributes.append("CODECS=\(quoted(video.codecs))")
+        if let supplemental = video.supplementalCodecs, !supplemental.isEmpty {
+            attributes.append("SUPPLEMENTAL-CODECS=\(quoted(supplemental))")
+        }
+        if video.width > 0, video.height > 0 {
+            attributes.append("RESOLUTION=\(video.width)x\(video.height)")
+        }
+        attributes.append("VIDEO-RANGE=\(videoRange(video.videoRange))")
+        attributes.append("URI=\(quoted(stream.uri))")
+        return "#EXT-X-I-FRAME-STREAM-INF:" + attributes.joined(separator: ",")
     }
 
     /// Media playlist flavours.
@@ -186,7 +215,9 @@ enum HLSPlaylists {
     /// covered by long real segments, or a remainder that rounds to nothing).
     static let minimumEstimatedDuration = 0.05
 
-    /// Media playlist. `mapURI` nil for WebVTT playlists.
+    /// Media playlist. `mapURI` nil for WebVTT playlists. `iFramesOnly`
+    /// (`.vod` only) makes it the I-frame playlist of the video rendition
+    /// (`RemuxIFrames`): `#EXT-X-I-FRAMES-ONLY`, the same EXTINF list.
     ///
     /// `.vod` spans the whole movie: the EXTINF list is `vodDurations` (real
     /// durations for the segments cut so far, then estimates for
@@ -212,7 +243,8 @@ enum HLSPlaylists {
                       expectedSegments: Int,
                       targetDuration: Double,
                       estimatedTotalSeconds: Double? = nil,
-                      type: PlaylistType = .vod) -> String {
+                      type: PlaylistType = .vod,
+                      iFramesOnly: Bool = false) -> String {
         let target = targetDuration.isFinite && targetDuration > 0 ? targetDuration : 6
         let durations: [Double]
         if type == .vod {
@@ -235,6 +267,9 @@ enum HLSPlaylists {
         switch type {
         case .vod:
             lines.append("#EXT-X-PLAYLIST-TYPE:VOD")
+            // Trick play: each entry is the keyframe opening the video
+            // segment of the same index, its EXTINF the time to the next one.
+            if iFramesOnly { lines.append("#EXT-X-I-FRAMES-ONLY") }
         case .event:
             lines.append("#EXT-X-PLAYLIST-TYPE:EVENT")
             // Without it AVPlayer joins an unfinished EVENT playlist near
