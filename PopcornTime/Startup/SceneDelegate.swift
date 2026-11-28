@@ -572,7 +572,7 @@ private enum DebugLaunchHooks {
     }
 
     /// `-PTDebugOpenPerson "<IMDb id>|<name>"`: a person's page pushed on the
-    /// selected tab, as a detail page's cast opens it (which needs Trakt).
+    /// selected tab, as a detail page's cast opens it (which needs a TMDB key).
     private static func open(person value: String, on navigationController: UINavigationController,
                              in tabBarController: TVTabBarController, focus focusContent: Bool) {
         let fields = value.split(separator: "|", maxSplits: 1).map(String.init)

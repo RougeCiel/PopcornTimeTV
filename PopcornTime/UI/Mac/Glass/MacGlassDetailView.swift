@@ -28,6 +28,9 @@ final class MacGlassPageState {
     /// The Movie / Show behind each related item (NavigationLink values). Set
     /// before `model.related`, which redraws the shelf.
     @ObservationIgnored var relatedMedia: [String: Media] = [:]
+    /// The Actor / Crew behind each cast item (their page's route). Set
+    /// before `model.people`, which redraws the shelf.
+    @ObservationIgnored var people: [String: Person] = [:]
     /// The title's IMDb id: its facts as the Home tells them (`HomeTitleFacts`).
     @ObservationIgnored var imdbId: String?
     /// Play's context menu: always show the quality sheet.
@@ -152,7 +155,7 @@ struct MacGlassDetailView: View {
                 .id(SectionID.related)
         }
         if !model.people.isEmpty || model.isLoadingPeople {
-            MacGlassCastShelf(people: model.people, isLoading: model.isLoadingPeople)
+            MacGlassCastShelf(people: model.people, isLoading: model.isLoadingPeople, page: page)
                 .id(SectionID.cast)
         }
         if !model.information.isEmpty || !model.accessibility.isEmpty {

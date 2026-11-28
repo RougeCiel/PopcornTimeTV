@@ -27,26 +27,12 @@ class PersonViewController: MainViewController {
     override func load(page: Int) {
         guard !collectionViewController.isLoading else { return }
         collectionViewController.isLoading = true
-        let group = DispatchGroup()
-        
-        let completion: ([AnyHashable], NSError?) -> Void = { [unowned self] (data, error) in
-            self.collectionViewController.dataSources[0] += data
+        // Their movies and shows from TMDB (Trakt, which gave them, refuses
+        // the app's key): nothing without a TMDB key, and the page says so.
+        DetailExtras.titles(of: currentItem) { [weak self] titles in
+            guard let self else { return }
+            self.collectionViewController.dataSources[0] += (titles ?? []).compactMap { $0 as? AnyHashable }
             self.collectionViewController.dataSources[0].unique()
-            self.collectionViewController.error = error
-            group.leave()
-        }
-        
-        group.enter()
-        TraktManager.shared.getMediaCredits(forPersonWithId: currentItem.imdbId, mediaType: Show.self) { results, error in
-            completion(results, error)
-        }
-
-        group.enter()
-        TraktManager.shared.getMediaCredits(forPersonWithId: currentItem.imdbId, mediaType: Movie.self) { results, error in
-            completion(results, error)
-        }
-        
-        group.notify(queue: .main) { [unowned self] in
             self.collectionViewController.isLoading = false
             self.collectionView?.reloadData()
         }

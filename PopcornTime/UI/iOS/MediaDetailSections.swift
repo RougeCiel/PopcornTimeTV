@@ -372,21 +372,14 @@ struct DetailCastRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 DetailShelf(title: "Cast & Crew", inset: inset, spacing: 14) {
                     ForEach(Array(DetailCastRow.ordered(actors).prefix(20).enumerated()), id: \.offset) { _, actor in
-                        VStack(spacing: 6) {
-                            GlassRemoteImage(url: DetailCastRow.photo(of: actor), maxPixelSize: 216) {
-                                ZStack {
-                                    Circle().fill(Color.white.opacity(0.1))
-                                    Text(verbatim: actor.initials).font(.headline).foregroundStyle(.secondary)
-                                }
+                        if DetailExtras.hasPage(actor) {
+                            NavigationLink(value: CatalogRoute.person(name: actor.name, imdbId: actor.imdbId, tmdbId: actor.tmdbId)) {
+                                lockup(actor)
                             }
-                            .frame(width: 72, height: 72)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
-                            Text(verbatim: actor.name).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.85)
-                            Text(verbatim: actor.characterName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            .buttonStyle(.plain)
+                        } else {
+                            lockup(actor)
                         }
-                        .frame(width: 84)
-                        .accessibilityElement(children: .combine)
                     }
                 }
                 if !directors.isEmpty {
@@ -401,6 +394,27 @@ struct DetailCastRow: View {
                 }
             }
         }
+    }
+
+    /// The actor's round photo, name and character; a link to their page
+    /// (`PersonGridView`) when TMDB can list their titles.
+    private func lockup(_ actor: Actor) -> some View {
+        VStack(spacing: 6) {
+            GlassRemoteImage(url: DetailCastRow.photo(of: actor), maxPixelSize: 216) {
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.1))
+                    Text(verbatim: actor.initials).font(.headline).foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
+            Text(verbatim: actor.name).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.85)
+            Text(verbatim: actor.characterName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .frame(width: 84)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 
     static func photo(of actor: Actor) -> URL? {

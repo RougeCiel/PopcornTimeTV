@@ -277,6 +277,8 @@ struct MacRootView: View {
             MacGlassDetailScreen(media: Show(title: title.isEmpty ? id : title, id: id), request: request)
         case .shelf(let id):
             MacShelfGridView(shelfID: id)
+        case .person(let name, let imdbId, let tmdbId):
+            MacPersonGridView(person: Actor(name: name, imdbId: imdbId, tmdbId: tmdbId))
         }
     }
 

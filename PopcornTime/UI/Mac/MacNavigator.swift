@@ -69,6 +69,9 @@ enum MacRoute: Hashable {
     /// A Home shelf's « See All »: its cards, then its catalogue's pages,
     /// on the Home's stack (`MacShelfGridView`).
     case shelf(id: String)
+    /// A cast or crew member's titles, from TMDB (`MacPersonGridView`):
+    /// the person as `TMDBDetailClient` knows them.
+    case person(name: String, imdbId: String, tmdbId: Int)
 }
 
 /// The Mac window's navigation and the state that outlives a section

@@ -32,13 +32,13 @@ class ShowDetailViewController: DetailViewController {
             let group = DispatchGroup()
             
             group.enter()
-            TraktManager.shared.getRelated(show) { related, _ in
+            DetailExtras.related(show) { related in
                 show.related = related
                 group.leave()
             }
 
             group.enter()
-            TraktManager.shared.getPeople(forMediaOfType: .shows, id: show.id) { actors, crew, _ in
+            DetailExtras.people(forMediaOfType: .shows, id: show.id) { actors, crew in
                 show.actors = actors
                 show.crew = crew
                 group.leave()

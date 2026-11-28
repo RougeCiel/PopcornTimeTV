@@ -391,7 +391,7 @@ public final class TMDBStreamingClient: @unchecked Sendable {
     /// in their order; the ones TMDB has none for are left out. `failed`:
     /// the titles whose lookup got no answer, even tried again (left out
     /// too — a caller that cannot have holes treats the page as a failure).
-    private func withImdbIds(_ results: [[String: Any]], kind: HomeItem.Kind,
+    func withImdbIds(_ results: [[String: Any]], kind: HomeItem.Kind,
                              completion: @escaping @Sendable (_ resolved: [[String: Any]], _ failed: Int) -> Void) {
         let tmdbIds = results.compactMap { ($0["id"] as? NSNumber)?.intValue }
         var seen = Set<Int>()
@@ -456,7 +456,7 @@ public final class TMDBStreamingClient: @unchecked Sendable {
     }
 
     /// The body of a 2xx answer, nil otherwise (no key, refused, offline).
-    private func get(_ path: String, completion: @escaping @Sendable (Data?) -> Void) {
+    func get(_ path: String, completion: @escaping @Sendable (Data?) -> Void) {
         if let recorded { return recorded(path, completion) }
         guard let key = apiKey(), let request = request(path, key: key) else { return completion(nil) }
         session.dataTask(with: request) { data, response, error in

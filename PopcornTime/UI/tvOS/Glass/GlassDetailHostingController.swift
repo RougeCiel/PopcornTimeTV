@@ -890,14 +890,13 @@ final class GlassDetailHostingController: UIHostingController<GlassDetailView>, 
         MainViewController.showDetail(of: media, on: navigationController, autoPlay: autoPlay)
     }
 
-    /// A cast or crew member: their filmography page. Only for a Trakt
-    /// person (IMDb "nm…" id) while Trakt answers: PersonViewController asks
-    /// Trakt alone, so the keyless people (OpenMetadata: "tvmaze:…",
-    /// "cinemeta:…" ids, or any id once Trakt refused the key) would open an
-    /// empty page. Their headshots stay focusable so the shelf still scrolls.
+    /// A cast or crew member: their filmography page, from TMDB. Only for a
+    /// person TMDB knows (a TMDB person, or an IMDb "nm…" id) while a TMDB
+    /// key is set and not refused: the keyless people (OpenMetadata:
+    /// "tvmaze:…", "cinemeta:…" ids) would open an empty page. Their
+    /// headshots stay focusable so the shelf still scrolls.
     private func openPerson(_ id: String) {
-        guard let person = people[id],
-              person.imdbId.hasPrefix("nm"), TraktManager.shared.isSignedIn(), !TraktManager.anonymousAccessRefused,
+        guard let person = people[id], DetailExtras.hasPage(person),
               let navigationController,
               let vc = UIStoryboard.main.instantiateViewController(withIdentifier: "PersonViewController") as? PersonViewController
         else { return }

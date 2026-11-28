@@ -280,7 +280,7 @@ final class MediaDetailViewModel: ObservableObject {
         session?.cancelPress()
     }
 
-    /// Fills the related titles and cast rows from the keyless sources
+    /// Fills the related titles and cast rows (TMDB with a key, else the keyless sources)
     /// (YTS, Cinemeta, TVMaze); Trakt only for a connected account
     /// (`DetailExtras`).
     private func loadRelatedAndPeople(of movie: Movie) {

@@ -42,13 +42,13 @@ class MovieDetailViewController: DetailViewController {
             let group = DispatchGroup()
                 
             group.enter()
-            TraktManager.shared.getRelated(movie) { related, _ in
+            DetailExtras.related(movie) { related in
                 movie.related = related
                 group.leave()
             }
 
             group.enter()
-            TraktManager.shared.getPeople(forMediaOfType: .movies, id: movie.id) { actors, crew, _ in
+            DetailExtras.people(forMediaOfType: .movies, id: movie.id) { actors, crew in
                 movie.actors = actors
                 movie.crew = crew
                 group.leave()

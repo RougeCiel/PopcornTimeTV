@@ -423,6 +423,7 @@ struct MacGlassRelatedShelf: View {
 struct MacGlassCastShelf: View {
     let people: [GlassPerson]
     let isLoading: Bool
+    let page: MacGlassPageState
 
     private static let size = MacGlassMetrics.headshot
 
@@ -442,14 +443,29 @@ struct MacGlassCastShelf: View {
                 .padding(.vertical, 16)
                 .accessibilityHidden(true)
             } else {
-                // Not clickable: the Mac app has no person page.
                 MacGlassShelf(items: people, itemWidth: MacGlassMetrics.personWidth, spacing: 14,
                               chevronCenter: Self.size / 2) { person in
-                    MacGlassPersonLockup(person: person, size: Self.size)
+                    tile(person)
                 }
             }
         }
         .padding(.top, MacGlassMetrics.sectionSpacing)
+    }
+}
+
+extension MacGlassCastShelf {
+    /// A link to the person's titles when TMDB can list them (a TMDB key,
+    /// a person TMDB knows); otherwise the lockup alone.
+    @ViewBuilder
+    fileprivate func tile(_ item: GlassPerson) -> some View {
+        if let person = page.people[item.id], DetailExtras.hasPage(person) {
+            NavigationLink(value: MacRoute.person(name: person.name, imdbId: person.imdbId, tmdbId: person.tmdbId)) {
+                MacGlassPersonLockup(person: item, size: Self.size)
+            }
+            .buttonStyle(MacGlassHoverButtonStyle())
+        } else {
+            MacGlassPersonLockup(person: item, size: Self.size)
+        }
     }
 }
 

@@ -434,15 +434,17 @@ final class MacGlassDetailController {
         }
     }
 
-    /// Cast & crew (YTS / Cinemeta / TVMaze), also the movie Information
-    /// card's Director(s) and Starring rows.
+    /// Cast & crew (TMDB with a key, else YTS / Cinemeta / TVMaze), also
+    /// the movie Information card's Director(s) and Starring rows.
     private func loadPeople() {
         model.isLoadingPeople = true
         let isMovie = movie != nil
         DetailExtras.people(forMediaOfType: isMovie ? .movies : .shows, id: media.id) { [weak self] actors, crew in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.model.people = GlassDetailAdapter.people(actors: actors, crew: crew).items
+                let people = GlassDetailAdapter.people(actors: actors, crew: crew)
+                self.page.people = people.people
+                self.model.people = people.items
                 self.model.isLoadingPeople = false
                 if var movie = self.movie {
                     self.loadedPeople = (actors, crew)

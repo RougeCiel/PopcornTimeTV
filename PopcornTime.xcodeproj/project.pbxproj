@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		005F0F659ADC4D7873165CFC /* StreamingSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07E0008725655B50F71E82F3 /* StreamingSettingsStore.swift */; };
+		00A5C6BE070E60DAC9640F18 /* TMDBDetailClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD78408690896EA58376EB71 /* TMDBDetailClient.swift */; };
+		010B5D2BFF81B7BC06317D4D /* TMDBDetailClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD78408690896EA58376EB71 /* TMDBDetailClient.swift */; };
 		0111DB7C90A68D6A9C74EED8 /* HomeFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0020856DC26C009F27DF96 /* HomeFeed.swift */; };
 		01C270DBFE3FE76967500F93 /* LibraryRemote.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10F45D737346813E820B91F /* LibraryRemote.swift */; };
 		01CD6166CF31FDECB539DAB0 /* HomeParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808D9FF876C6F09389C72ACE /* HomeParsers.swift */; };
@@ -17,6 +19,7 @@
 		0399480E1CB4205CFB2A684E /* HomeTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF0FE3BA5AC02041521F1C5 /* HomeTestSupport.swift */; };
 		03E32550E699FBF52DF6ACFD /* HomeHeroCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F2A454C33A18AB3E868D97 /* HomeHeroCarousel.swift */; };
 		046C7824CA70F6847790A0A5 /* ContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E401073857E1F069D439ACC /* ContentProvider.swift */; };
+		04725B93187C06247C33C760 /* TMDBDetailClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 401653FAE63A665138157DCA /* TMDBDetailClientTests.swift */; };
 		0479604FC7958A1A8AE9E2EB /* AnimeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D0F9D031E6F296400860852 /* AnimeManager.swift */; };
 		0499A047768E4087BC0E3C3D /* HomeLibraryHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E5E2ABF0130319D16A64105 /* HomeLibraryHooks.swift */; };
 		04A2208063AC6E8D9CA81969 /* HomeShelfRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EA5B85F317F8FA490EF748 /* HomeShelfRow.swift */; };
@@ -625,6 +628,7 @@
 		8BC35C63B0A46B56B1E7EF85 /* HomeCardText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1E41B9DD7219A8B505AD56 /* HomeCardText.swift */; };
 		8C75903E7CD93B2785FC8D07 /* Top100Resolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21D3391F815239A6A11AAB6 /* Top100Resolver.swift */; };
 		8D058521F90083E4AD322E1D /* HomeCursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F0487506CBCAA2690596913 /* HomeCursor.swift */; };
+		8D3C3401D33D95C31DEE6F73 /* PersonGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92F800DAE6C2807753008E14 /* PersonGridView.swift */; };
 		8DB2DB67A32FC9D268005104 /* Subtitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D0F9D221E6F298000860852 /* Subtitle.swift */; };
 		8E3148E4407BE653E48EBE49 /* PopcornKit macOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 45CDBF4716482AE9CE39BC5C /* PopcornKit macOS.framework */; };
 		8E8B331A63AAD4F1947210E4 /* RemuxPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43ACA0733CDCDC15FEE82849 /* RemuxPlayback.swift */; };
@@ -680,6 +684,7 @@
 		9E8FBE07DF022AEEBB5DAF98 /* MovieSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3F3D6C1B4C29507D65C764 /* MovieSources.swift */; };
 		9F27A5C9F0E830021B8E92EF /* DownloadsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50BBCB3E80C6E0831546965 /* DownloadsUITests.swift */; };
 		9F8D16CD3E43E0C7A33D8093 /* RemuxWaitNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2828D5CB95B223B4F034EC8 /* RemuxWaitNudge.swift */; };
+		9FBDEF78A014A26085464101 /* TMDBDetailClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD78408690896EA58376EB71 /* TMDBDetailClient.swift */; };
 		9FD04602B34D6F5BFB9F59AC /* PosterCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 581F89D7D616DE25FFD06CB5 /* PosterCardTests.swift */; };
 		A0968581FFF83ACF2ABC9053 /* ThemeSongManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D0F9D051E6F296400860852 /* ThemeSongManager.swift */; };
 		A0CAEC25C2B18F913DF6F615 /* MacLibraryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D814477E5858ED061FFD359 /* MacLibraryState.swift */; };
@@ -952,6 +957,7 @@
 		FE7F982C951B73928B5B5AF3 /* UpNextPressGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32664411EB7F60470D4C699F /* UpNextPressGuard.swift */; };
 		FEC6519891C921C26B8C6081 /* SearchSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0280A81B01DE3504221324 /* SearchSessionTests.swift */; };
 		FEFB8A8C4143FF84DD624C19 /* SubtitleOverlayViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FEC0DCA49CBD62AC7085547 /* SubtitleOverlayViews.swift */; };
+		FFE00A37F091E94F9F009463 /* MacPersonGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA414DD7C37237AA20DC104C /* MacPersonGridView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1156,6 +1162,7 @@
 		3EC80D936120986C06A00498 /* String+Localized.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "String+Localized.swift"; path = "PopcornKit/Resources/String+Localized.swift"; sourceTree = SOURCE_ROOT; };
 		3F2BB79851BC3DFD21EB6C07 /* DetailStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailStoreTests.swift; path = PopcornTimeTests/Detail/DetailStoreTests.swift; sourceTree = SOURCE_ROOT; };
 		3F6C2A7561B1289B261A09D5 /* SubtitleSyncAlignerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SubtitleSyncAlignerTests.swift; path = PopcornTimeTests/Remux/SubtitleSyncAlignerTests.swift; sourceTree = SOURCE_ROOT; };
+		401653FAE63A665138157DCA /* TMDBDetailClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TMDBDetailClientTests.swift; path = PopcornTimeTests/Detail/TMDBDetailClientTests.swift; sourceTree = SOURCE_ROOT; };
 		41535FD3C38D05E4D302FD2A /* HomeHostingController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeHostingController.swift; path = PopcornTime/UI/tvOS/Home/HomeHostingController.swift; sourceTree = SOURCE_ROOT; };
 		418CFD2171BD6B1F3C4DCF58 /* PlaybackStartMeasure.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaybackStartMeasure.swift; path = PopcornKit/Managers/Playback/PlaybackStartMeasure.swift; sourceTree = SOURCE_ROOT; };
 		41C3A2739F2F129E38750FC7 /* MacSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSettingsView.swift; sourceTree = "<group>"; };
@@ -1481,6 +1488,7 @@
 		90DCBD14826E22041050CC2C /* ProfileTaste.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileTaste.swift; path = PopcornKit/Managers/Profiles/ProfileTaste.swift; sourceTree = SOURCE_ROOT; };
 		910078B6ED3564885E7DC3FA /* GlassShelves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassShelves.swift; sourceTree = "<group>"; };
 		92EA5B85F317F8FA490EF748 /* HomeShelfRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeShelfRow.swift; path = "PopcornTime/UI/Shared SwiftUI/Home/HomeShelfRow.swift"; sourceTree = SOURCE_ROOT; };
+		92F800DAE6C2807753008E14 /* PersonGridView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PersonGridView.swift; path = PopcornTime/UI/iOS/PersonGridView.swift; sourceTree = SOURCE_ROOT; };
 		93A4CBBE36C30AE3F3835B20 /* BoundedStorageSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoundedStorageSession.swift; sourceTree = "<group>"; };
 		95DB120BCB1229D3EB25F091 /* VLCPlayheadWatchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VLCPlayheadWatchTests.swift; path = PopcornTimeTests/Playback/VLCPlayheadWatchTests.swift; sourceTree = SOURCE_ROOT; };
 		98AB3D698AB5ABC3DD81B257 /* ResumeStartTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ResumeStartTests.swift; path = PopcornTimeTests/Playback/ResumeStartTests.swift; sourceTree = SOURCE_ROOT; };
@@ -1536,6 +1544,7 @@
 		BBAB69B0A18FF53AC973F911 /* GlassHeroView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassHeroView.swift; sourceTree = "<group>"; };
 		BBE0A61332D00A33B8CEA411 /* MediaDetailSections.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaDetailSections.swift; path = PopcornTime/UI/iOS/MediaDetailSections.swift; sourceTree = SOURCE_ROOT; };
 		BCF3939D56332BBE5241D6CF /* MacGlassComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacGlassComponents.swift; sourceTree = "<group>"; };
+		BD78408690896EA58376EB71 /* TMDBDetailClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TMDBDetailClient.swift; path = PopcornKit/Managers/Detail/TMDBDetailClient.swift; sourceTree = SOURCE_ROOT; };
 		BE23C29C7331612CD4A38E6B /* PosterCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PosterCard.swift; path = PopcornTime/UI/iOS/PosterCard.swift; sourceTree = SOURCE_ROOT; };
 		BFB220FFCCA0BD315227CAF6 /* MoviesGridView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MoviesGridView.swift; path = PopcornTime/UI/iOS/MoviesGridView.swift; sourceTree = SOURCE_ROOT; };
 		C28893230E5DFE59BDA0D7B2 /* ProfileManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileManagerTests.swift; path = PopcornTimeTests/Library/ProfileManagerTests.swift; sourceTree = SOURCE_ROOT; };
@@ -1576,6 +1585,7 @@
 		D79E1E35558514D5FFA86CEF /* PirateBayTop100.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PirateBayTop100.swift; path = PopcornKit/Managers/Providers/PirateBayTop100.swift; sourceTree = SOURCE_ROOT; };
 		D89E46005A42C801577E9AD2 /* RemoteScriptUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RemoteScriptUITests.swift; path = PopcornTimetvOSUITests/RemoteScriptUITests.swift; sourceTree = SOURCE_ROOT; };
 		DA20606C469E2F2113537B4E /* PosterViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PosterViews.swift; path = PopcornTime/UI/tvOS/Grid/PosterViews.swift; sourceTree = SOURCE_ROOT; };
+		DA414DD7C37237AA20DC104C /* MacPersonGridView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MacPersonGridView.swift; path = PopcornTime/UI/Mac/MacPersonGridView.swift; sourceTree = SOURCE_ROOT; };
 		DDD496D346ADD1AB9B388BE8 /* HomeCollage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeCollage.swift; path = PopcornTime/UI/tvOS/Home/HomeCollage.swift; sourceTree = SOURCE_ROOT; };
 		DE894EFADC40F087D6B87A60 /* IndexFetcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = IndexFetcher.swift; path = PopcornKit/Managers/Providers/IndexFetcher.swift; sourceTree = SOURCE_ROOT; };
 		DE96A3C033AAA0359ED427BC /* MediaProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaProvider.swift; path = PopcornKit/Managers/Providers/MediaProvider.swift; sourceTree = SOURCE_ROOT; };
@@ -1855,6 +1865,7 @@
 				0BFDBCF9C73EA0A0EFD7F142 /* MacHomeView.swift */,
 				8D0E45B162974D81E0052F59 /* MacStreamingSettingsView.swift */,
 				8038B593395EA44B91306C95 /* MacLanguagesView.swift */,
+				DA414DD7C37237AA20DC104C /* MacPersonGridView.swift */,
 			);
 			name = Mac;
 			path = Mac;
@@ -1885,6 +1896,7 @@
 				2187CEADB1AC0D29B6A61DFF /* HomeTabView.swift */,
 				C837225C43EFD8EA8144B71D /* StreamingSettingsViews.swift */,
 				6DD9096288DC26587B3CF758 /* LanguagesView.swift */,
+				92F800DAE6C2807753008E14 /* PersonGridView.swift */,
 			);
 			name = iOS;
 			path = UI/iOS;
@@ -2501,6 +2513,7 @@
 				61065C9B4A13F6A9E67749BD /* DetailStore.swift */,
 				03B916517EA8ED6FEB44589B /* DetailSession.swift */,
 				6EC4CBBF74F3F58286106C72 /* DetailExtras.swift */,
+				BD78408690896EA58376EB71 /* TMDBDetailClient.swift */,
 			);
 			name = Detail;
 			sourceTree = "<group>";
@@ -2726,6 +2739,7 @@
 				EE78C3C043E332CB0498758E /* DetailTestSupport.swift */,
 				8EAB37B3640CD0C83AA92540 /* DetailSessionTests.swift */,
 				3F2BB79851BC3DFD21EB6C07 /* DetailStoreTests.swift */,
+				401653FAE63A665138157DCA /* TMDBDetailClientTests.swift */,
 			);
 			name = Detail;
 			sourceTree = "<group>";
@@ -3594,6 +3608,7 @@
 				0C9807029D6F4527E5D6852A /* SubtitleAutoSyncTests.swift in Sources */,
 				B10165AD315E9ED0C27345B1 /* LanguagesByTypeModel.swift in Sources */,
 				B8BB7677E2B0F96781000255 /* ContentLanguagesTests.swift in Sources */,
+				04725B93187C06247C33C760 /* TMDBDetailClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3924,6 +3939,7 @@
 				1E48A00CBC581269B0CCC25D /* ProfileManager.swift in Sources */,
 				0957573802954CDBF8389B82 /* ProfileTaste.swift in Sources */,
 				C47DBD6E7774C9AA47C5DD4D /* ContentLanguages.swift in Sources */,
+				010B5D2BFF81B7BC06317D4D /* TMDBDetailClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4052,6 +4068,7 @@
 				2B38C39E8EB1EA1450406E96 /* ProfileManager.swift in Sources */,
 				34112B6F8532DAD9ECD0F677 /* ProfileTaste.swift in Sources */,
 				8858DC3D9B957D34D1D9E9A3 /* ContentLanguages.swift in Sources */,
+				00A5C6BE070E60DAC9640F18 /* TMDBDetailClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4167,6 +4184,7 @@
 				5B35B00BFB70A8B16310B4BA /* ProfileManager.swift in Sources */,
 				D01151340B2FD28E38FA3179 /* ProfileTaste.swift in Sources */,
 				55672F2704B824C67536CF5F /* ContentLanguages.swift in Sources */,
+				9FBDEF78A014A26085464101 /* TMDBDetailClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4269,6 +4287,7 @@
 				D6823B48567FD9259EB12795 /* LanguagesByTypeModel.swift in Sources */,
 				BDAF62BEB932F879F985924D /* MacLanguagesView.swift in Sources */,
 				1B3E2F086D47ABE872F2C481 /* SubtitleHashLookup.swift in Sources */,
+				FFE00A37F091E94F9F009463 /* MacPersonGridView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4373,6 +4392,7 @@
 				A7E1C8099CAD8A0C0123F90E /* LanguagesByTypeModel.swift in Sources */,
 				87B2DA933FF9BA945627C0B5 /* LanguagesView.swift in Sources */,
 				35E87ACD3C173FDBD041F424 /* SubtitleHashLookup.swift in Sources */,
+				8D3C3401D33D95C31DEE6F73 /* PersonGridView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

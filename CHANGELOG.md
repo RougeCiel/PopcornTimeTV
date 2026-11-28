@@ -62,6 +62,18 @@ independent decoder re-read all 719 frames of that file. Not yet seen on an HDR1
 - A stream whose frames carry HDR10+, its own or converted, is announced as HDR10+ to the player
   (`SUPPLEMENTAL-CODECS` with the `cdm4` brand, as Apple asks since 2024).
 
+**Related titles, cast and people from TMDB (Apple TV, iPhone / iPad, Mac)**
+- With a TMDB key (the one of the streaming services, Settings), a title's page takes from TMDB
+  what Trakt gave until it refused the app's key: « Viewers Also Watched » (TMDB's
+  recommendations, its similar titles when it has none), the cast in billing order with photos
+  and characters, a movie's directors and writers, a show's creators. A cast or crew member opens
+  their page again on the Apple TV, and now on the iPhone, iPad and Mac too: their movies and
+  shows, the most watched first, without talk shows, news, reality TV or appearances as
+  themselves. The IMDb ↔ TMDB ids come from TMDB (`/find`, external ids kept on disk).
+- Without a key, or when TMDB does not answer, the page shows what the keyless sources (YTS,
+  Cinemeta, TVMaze) give, as before; the people from these sources open no page, and a section
+  with nothing stays hidden. A connected Trakt account is no longer asked first.
+
 ## 5.4.1
 
 Its short form is shown once in the app after the update (`WhatsNewRelease.v5_4_1`).

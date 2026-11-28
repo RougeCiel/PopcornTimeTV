@@ -12,6 +12,9 @@ enum CatalogRoute: Hashable {
     /// A Home shelf's own cards, in its order, then its catalogue's next
     /// pages ("See All" of the Home).
     case shelf(id: String)
+    /// A cast or crew member's titles, from TMDB (`PersonGridView`): the
+    /// person as `TMDBDetailClient` knows them.
+    case person(name: String, imdbId: String, tmdbId: Int)
 }
 
 /// A title's page pushed with more than the title: the card it zooms out of
@@ -216,6 +219,8 @@ struct MediaStack<Root: View>: View {
                         ShowsGridView(filter: filter, genre: genre, isRoot: false)
                     case .shelf(let id):
                         HomeShelfGridView(shelfID: id)
+                    case .person(let name, let imdbId, let tmdbId):
+                        PersonGridView(person: Actor(name: name, imdbId: imdbId, tmdbId: tmdbId))
                     }
                 }
         }
