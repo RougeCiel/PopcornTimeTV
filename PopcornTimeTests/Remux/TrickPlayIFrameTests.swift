@@ -334,6 +334,31 @@ final class TrickPlayIFrameTests: RemuxSessionTestCase {
         player.pause()
     }
 
+    /// With `PT_TRICKPLAY_MKV` and `PT_TRICKPLAY_SERVE=<seconds>`: serves that MKV's remux on
+    /// 127.0.0.1 for that long and writes its master URL to `PT_TRICKPLAY_URL_FILE` (when set) —
+    /// for an `AVPlayerViewController` in the Apple TV simulator, which reaches the Mac's loopback,
+    /// to show the scrubbing thumbnails. Skipped without both variables.
+    func testServesTheRemuxForASimulator() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["PT_TRICKPLAY_MKV"], !path.isEmpty,
+              let seconds = environment["PT_TRICKPLAY_SERVE"].flatMap(Double.init), seconds > 0 else {
+            throw XCTSkip("set PT_TRICKPLAY_MKV and PT_TRICKPLAY_SERVE")
+        }
+        RemuxPlayback.uptimeProvider = nil
+        let remux = RemuxPlayback(localFile: URL(fileURLWithPath: path), streamer: nil)
+        var ready: URL?
+        remux.onReady = { ready = $0 }
+        remux.start()
+        defer { remux.stop() }
+        let deadline = Date(timeIntervalSinceNow: 60)
+        while ready == nil, Date() < deadline { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05)) }
+        guard let url = ready else { return check(false, "the remux gets ready") }
+        print("[TrickPlay] serving \(url) for \(Int(seconds)) s")
+        if let file = environment["PT_TRICKPLAY_URL_FILE"] { try url.absoluteString.write(toFile: file, atomically: true, encoding: .utf8) }
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: seconds))
+        print("[TrickPlay] \(remux.iFramesServed) I-frames served")
+    }
+
     func testNoIFramesBeforeTheSessionIsReady() {
         guard let files = temporaryInput(Data()) else { return }
         let remux = RemuxPlayback(localFile: files.input, streamer: nil)
